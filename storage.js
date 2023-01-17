@@ -33,10 +33,21 @@ function listRemove(key, value) {
     });
 }
 
-function listContains(key, value) {
+function listFind(key, value) {
     return listGet(key).then(list => {
-        return list.includes(value);
+        return list.indexOf(value) !== -1;
     });
 }
 
-export default { set, get, remove, listInsert, listRemove, listContains }
+function listUpdate(key, value, newValue) {
+    return listGet(key).then(list => {
+        list[list.indexOf(value)] = newValue;
+        set(key, list);
+    });
+}
+
+function listClear(key) {
+    return set(key, []);
+}
+
+export default { set, get, remove, listInsert, listRemove, listFind, listUpdate, listClear }
