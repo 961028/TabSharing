@@ -50,4 +50,4 @@ function listClear(key) {
     return set(key, []);
 }
 
-export default { set, get, remove, listInsert, listRemove, listFind, listUpdate, listClear }
+export default { set, get, remove, listGet, listInsert, listRemove, listFind, listUpdate, listClear }
