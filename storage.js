@@ -13,35 +13,4 @@ function remove(key) {
     browser.storage.local.remove(key)
 }
 
-
-function listGet(key) {
-    // Gets the list stored under key in the browser's local storage
-    return get(key).then(result => {
-        if (result[key] === undefined) {
-            return [];
-        } else {
-            return result[key];
-        }
-    });
-}
-
-function listAdd(key, value) {
-    // Adds value to the list stored under key in the browser's local storage
-    return listGet(key).then(list => {
-        if (list.indexOf(value) === -1) {
-            list.push(value);
-            set(key, list);
-        }
-    });
-}
-
-function listRemove(key, value) {
-    // Removes value from the list stored under key in the browser's local storage
-    return listGet(key).then(list => {
-        let index = list.indexOf(value);
-        if (index !== -1) {
-            list.splice(index, 1);
-            set(key, list);
-        }
-    });
-}
+export { set, get, remove };
