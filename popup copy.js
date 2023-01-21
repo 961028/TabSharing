@@ -32,7 +32,6 @@ function push(key, value) {
 }
 
 function removeFromList(key, value) {
-  
   getList(key).then((list) => {
       let index = list.indexOf(value);
       if (index > -1) {

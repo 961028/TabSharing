@@ -1,0 +1,29 @@
+set(key, value): This function is used to set key-value pairs in the browser's local storage. The function takes in two parameters, the key (a string) and the value (a string, number, or object) to be stored. The key-value pair is stored in the browser's local storage and can be retrieved using the get() function.
+
+get(key): This function is used to retrieve the value stored under a specified key in the browser's local storage. The function takes in one parameter, the key (a string) of the desired value. The function returns the value stored under the specified key, or null if the key does not exist in the local storage.
+
+remove(key): This function is used to remove a key and its associated value from the browser's local storage. The function takes in one parameter, the key (a string) of the key-value pair to be removed. The function removes the key-value pair from the local storage, and the key will no longer exist in the local storage.
+
+getList(key): This function is used to retrieve a list stored under a specified key in the browser's local storage. The function takes in one parameter, the key (a string) of the desired list. The function returns the list stored under the specified key, or null if the key does not exist in the local storage.
+
+push(key, value): This function is used to add a new value to an existing list stored under a specified key in the browser's local storage. The function takes in two parameters, the key (a string) of the list and the value (a string, number, or object) to be added. The value is added to the end of the existing list, and the modified list is stored back in the local storage.
+
+removeFromList(key, value): This function is used to remove a specified value from a list stored under a specified key in the browser's local storage. The function takes in two parameters, the key (a string) of the list and the value (a string, number, or object) to be removed. The value is removed from the list, and the modified list is stored back in the local storage.
+
+setWindowSession(name): This function is used to set the name of the current window session in the browser's storage. The function takes in one parameter, the name (a string) of the current session. The function stores the name in the browser's storage and the session can be retrieved using the getWindowSession() function.
+
+getWindowSession(): This function is used to retrieve the name of the current window session from the browser's storage. The function takes no parameters. The function returns the name of the current session, or null if a session name is not set.
+
+saveSession(): This function is used to save the current session with a specified name. The function takes in no parameters. It retrieves the current open tabs from the browser, sets the window session to the current session name, pushes the current session name to the list of session names stored in the browser's storage, and displays the tabs and sessions.
+
+openSession(): This function is used to open a saved session by retrieving the tabs stored under the current session name, clearing whatever tabs are currently open in the window, and creating new tabs with the URLs of the stored tabs. The function takes in no parameters. Before opening the session, the function checks if the current window is saved as a session and if not, it will prompt the user if they want to proceed and overwrite the current unsaved window. If the user confirms, the current unsaved tabs will be lost.
+
+displayTabs(): This function is used to display the tabs stored under the current session name. The function takes in no parameters.
+
+displaySessions(): This function is used to display the list of session names stored in the browser's local storage. The function takes in no parameters. It retrieves the list of session names from the local storage and displays them to the user.
+
+updateStorageTab(tabId, changeInfo, tabInfo): This function is used to update the title and URL of a tab in the current session's tab list. The function takes in three parameters, the tabId (a string) of the tab to be updated, the changeInfo (an object) containing information about the changes made to the tab, and the tabInfo (an object) containing information about the tab. The function updates the tab's title and URL in the current session's tab list stored in the browser's local storage.
+
+createStorageTab(tab): This function is used to create a new tab in the current session's tab list. The function takes in one parameter, the tab (an object) containing information about the new tab. The function creates a new tab with the provided information and stores it in the current session's tab list in the browser's local storage.
+
+removeStorageTab(tabId): This function is used to remove a tab from the current session's tab list. The function takes in one parameter, the tabId (a string) of the tab to be removed. The function removes the tab with the specified tabId from the current session's tab list stored in the browser's local storage.
