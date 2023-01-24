@@ -23,13 +23,12 @@ displayTabs(): This function is used to display the tabs stored under the curren
 
 displaySessions(): This function is used to display the list of session names stored in the browser's storage. The function takes in no parameters. It retrieves the list of session names from the storage and displays them to the user.
 
-updateStorageTab(tabId, changeInfo, tabInfo): This function is used to update the title and URL of a tab in the current session's tab list. The function takes in three parameters, the tabId (a string) of the tab to be updated, the changeInfo (an object) containing information about the changes made to the tab, and the tabInfo (an object) containing information about the tab. The function updates the tab's title and URL in the current session's tab list stored in the browser's storage.
+updateStorageTab(id, changeInfo, tabInfo): This function is used to update the title and URL of a tab in the current session's tab list. The function takes in three parameters, the id (a string) of the tab to be updated, the changeInfo (an object) containing information about the changes made to the tab, and the tabInfo (an object) containing information about the tab. The function updates the tab's title and URL in the current session's tab list stored in the browser's storage.
 
 createStorageTab(tab): This function is used to create a new tab in the current session's tab list. The function takes in one parameter, the tab (an object) containing information about the new tab. The function creates a new tab with the provided information and stores it in the current session's tab list in the browser's storage.
 
-removeStorageTab(tabId): This function is used to remove a tab from the current session's tab list. The function takes in one parameter, the tabId (a string) of the tab to be removed. The function removes the tab with the specified tabId from the current session's tab list stored in the browser's storage.
+removeStorageTab(id): This function is used to remove a tab from the current session's tab list. The function takes in one parameter, the id (a string) of the tab to be removed. The function removes the tab with the specified id from the current session's tab list stored in the browser's storage.
 */
-
 
 
 function set(key, value) {
@@ -66,28 +65,24 @@ async function removeFromList(key, value) {
   }
 }
 
-function setWindowSession(name) {
-  set('currentWindowSession', name);
+async function setWindowSession(name) {
+  await set('currentWindowSession', name);
 }
 
 async function getWindowSession() {
   return await get('currentWindowSession');
 }
 
-async function saveSession() {
-  const tabs = await browser.tabs.query({ currentWindow: true });
-  const sessionName = nameInput.value;
+async function saveSession(sessionName) {
   setWindowSession(sessionName);
   push('sessionNames', sessionName);
-  tabs.forEach(tab => {
-    push(sessionName, tab);
-  });
+  const tabs = await browser.tabs.query({ currentWindow: true });
+  set(sessionName, tabs);
   displayTabs();
   displaySessions();
 }
 
-async function openSession() {
-  const sessionName = nameInput.value;
+async function openSession(sessionName) {
   const windowSession = await getWindowSession();
   if (!windowSession) {
     const result = confirm(
@@ -113,70 +108,71 @@ async function openSession() {
   displayTabs();
 }
 
-async function displayTabs() {
-  const sessionName = nameInput.value;
-  const tabs = await getList(sessionName);
-  const tabList = document.createElement('ul');
-  tabs.forEach(tab => {
-    const tabItem = document.createElement('li');
-    tabItem.innerText = tab.title;
-    tabList.appendChild(tabItem);
-  });
-  document.getElementById('tabs').innerHTML = '';
-  document.getElementById('tabs').appendChild(tabList);
-}
-
-async function displaySessions() {
-  const sessionNames = await getList('sessionNames');
-  const sessionList = document.createElement('ul');
-  sessionNames.forEach(sessionName => {
-    const sessionItem = document.createElement('li');
-    sessionItem.innerText = sessionName;
-    sessionList.appendChild(sessionItem);
-  });
-  document.getElementById('sessions').innerHTML = '';
-  document.getElementById('sessions').appendChild(sessionList);
-}
-
-async function updateStorageTab(tabId, changeInfo, tabInfo) {
+async function updateStorageTab(id, changeInfo, tabInfo) {
   const sessionName = await getWindowSession();
   const tabs = getList(sessionName);
   tabs.forEach(tab => {
-    if (tab.tabId === tabId) {
+    if (tab.id === id) {
       tab.title = changeInfo.title;
       tab.url = tabInfo.url;
     }
   });
   set(sessionName, tabs);
+  displayTabs();
 }
 
 async function createStorageTab(tab) {
   const sessionName = await getWindowSession();
   push(sessionName, tab);
+  displayTabs();
 }
 
-async function removeStorageTab(tabId) {
+async function removeStorageTab(id) {
   const sessionName = await getWindowSession();
-  const tabs = getList(sessionName);
-  tabs.forEach(tab => {
-    if (tab.tabId === tab.tabId) {
-      removeFromList(sessionName, tab);
-    }
+  const tabs = await getList(sessionName);
+  await push('sessionNames', 'to be removed:' + id);
+  tabs.forEach(async tab => {
+    await push('sessionNames', 'tabs:' + tab.title + ' - ' + tab.id);
   });
+  const filteredTabs = tabs.filter(tab => tab.id !== id);
+  filteredTabs.forEach(async tab => {
+    await push('sessionNames', 'tabs:' + tab.title + ' - ' + tab.id);
+  });
+  set(sessionName, filteredTabs);
+  displayTabs();
+}
+
+browser.runtime.onMessage.addListener(data => {
+  if (data.type === 'saveSession') {
+    //popup("received save session");
+    saveSession(data.name);
+  }
+  else if (data.type === 'openSession') {
+    //popup("received open session");
+    openSession(data.name);
+  }
+  else if (data.type === 'refresh') {
+    //popup("received refresh");
+    displayTabs();
+    displaySessions();
+  }
+});
+
+async function displayTabs() {
+  const sessionName = await getWindowSession();
+  const tabs = await getList(sessionName);
+  browser.runtime.sendMessage({type: 'displayTabs', tabs: tabs});
+}
+
+async function displaySessions() {
+  const sessionNames = await getList('sessionNames');
+  browser.runtime.sendMessage({type: 'displaySessions', sessions: sessionNames});
+}
+
+function popup(message) {
+  browser.runtime.sendMessage({type: 'popup', message: message});
 }
 
 browser.tabs.onUpdated.addListener(updateStorageTab);
 browser.tabs.onCreated.addListener(createStorageTab);
 browser.tabs.onRemoved.addListener(removeStorageTab);
-
-browser.runtime.onMessage.addListener(data => {
-    if (data.type === 'saveSession') {
-        saveSession(data.name);
-    }
-    else if (data.type === 'openSession') {
-        openSession(data.name);
-    }
-});
-
-displayTabs();
-displaySessions();
