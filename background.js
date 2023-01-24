@@ -130,14 +130,7 @@ async function createStorageTab(tab) {
 async function removeStorageTab(id) {
   const sessionName = await getWindowSession();
   const tabs = await getList(sessionName);
-  await push('sessionNames', 'to be removed:' + id);
-  tabs.forEach(async tab => {
-    await push('sessionNames', 'tabs:' + tab.title + ' - ' + tab.id);
-  });
   const filteredTabs = tabs.filter(tab => tab.id !== id);
-  filteredTabs.forEach(async tab => {
-    await push('sessionNames', 'tabs:' + tab.title + ' - ' + tab.id);
-  });
   set(sessionName, filteredTabs);
   displayTabs();
 }
