@@ -6,26 +6,28 @@ const tabs = document.getElementById('tabs');
 const sessions = document.getElementById('sessions');
 
 async function displayTabs(listOfTabs) {
-  //alert("started displaying tabs");
   const tabList = document.createElement('ul');
   listOfTabs.forEach(tab => {
     const tabItem = document.createElement('li');
     tabItem.innerText = tab.title;
     tabList.appendChild(tabItem);
-    const id = document.createElement('li');
-    id.innerText = tab.id;
-    tabList.appendChild(id);
+    const tabId = document.createElement('li');
+    tabId.innerText = tab.id;
+    tabList.appendChild(tabId);
   });
   document.getElementById('tabs').innerHTML = '';
   document.getElementById('tabs').appendChild(tabList);
 }
 
-async function displaySessions(listOfSessions) {
-  //alert("started displaying sessions");
+async function displaySessions(listOfSessions, highlightedSession) {
   const sessionList = document.createElement('ul');
   listOfSessions.forEach(sessionName => {
     const sessionItem = document.createElement('li');
-    sessionItem.innerText = sessionName;
+    if (sessionName == highlightedSession) {
+      sessionItem.innerText = 'current: ' + sessionName;
+    } else {
+      sessionItem.innerText = sessionName;
+    }
     sessionList.appendChild(sessionItem);
   });
   document.getElementById('sessions').innerHTML = '';
@@ -33,14 +35,16 @@ async function displaySessions(listOfSessions) {
 }
 
 browser.runtime.onMessage.addListener(data => {
-  if (data.type === 'displayTabs') {
-    displayTabs(data.tabs);
-  }
-  else if (data.type === 'displaySessions') {
-    displaySessions(data.sessions);
-  }
-  else if(data.type === 'popup') {
-    alert(data.message);
+  switch (data.type) {
+    case 'displayTabs':
+      displayTabs(data.tabs);
+      break;
+    case 'displaySessions':
+      displaySessions(data.sessions, data.highlightedSession);
+      break;
+    case 'popup':
+      alert(data.message);
+      break;
   }
 });
 
