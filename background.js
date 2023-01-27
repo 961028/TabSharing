@@ -218,7 +218,7 @@ async function displaySessions() {
 }
 
 /**
-* Displays a message in the popup.
+* Displays a message in the popup using alert.
 * @param {string} message The message to display.
 */
 function popup(message) {
