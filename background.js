@@ -1,3 +1,7 @@
+const currentSession = 'CurrentSession';
+const sessionsList = 'CurrentSession';
+const tabsLists = 'CurrentSession'
+
 /**
 * Sets a key/value pair in the storage.
 * @param {string} key The key to set.
@@ -66,7 +70,7 @@ async function removeFromList(key, value) {
 * @param {string} name The name of the session.
 */
 async function setWindowSession(name) {
-  await set('currentWindowSession', name);
+  await set(currentSession, name);
 }
 
 /**
@@ -74,7 +78,7 @@ async function setWindowSession(name) {
 * @returns {Promise<string>} The name of the session.
 */
 async function getCurrentSession() {
-  return await get('currentWindowSession');
+  return await get(currentSession);
 }
 
 /**
@@ -111,9 +115,9 @@ async function openSession(sessionName) {
     }
   }
 */
-  const tabs = await browser.tabs.query({ currentWindow: true });
-  closeTabs(tabs);
-  const newTabs = await getList(newTabs);
+  //const tabs = await browser.tabs.query({ currentWindow: true });
+  //closeTabs(tabs);
+  const newTabs = await getList(sessionName);
   openTabs(newTabs);
 
   setWindowSession(sessionName);
@@ -138,6 +142,7 @@ async function closeTabs(tabs) {
 */
 async function openTabs(tabs) {
   for (const tab of tabs) {
+    push('sessionNames', tab.url);
     await browser.tabs.create({
         url: tab.url
     });
