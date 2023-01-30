@@ -47,6 +47,19 @@ async function push(key, value) {
 }
 
 /**
+* Pushes multiple values to a list in the storage.
+* @param {string} key The key of the list.
+* @param {any} value The values to push.
+*/
+async function pushMultiple(key, values) {
+  const list = await getList(key);
+  values.forEach(value => {
+    list.push(value);
+  });
+  set(key, list);
+}
+
+/**
 * Removes a value from a list in the storage.
 * @param {string} key The key of the list.
 * @param {any} value The value to remove.
