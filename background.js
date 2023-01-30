@@ -1,6 +1,5 @@
 const currentSession = 'CurrentSession';
-const sessionsList = 'CurrentSession';
-const tabsLists = 'CurrentSession'
+const sessionsList = 'Sessions';
 
 /**
 * Sets a key/value pair in the storage.
@@ -20,14 +19,6 @@ function set(key, value) {
 async function get(key) {
   const result = await browser.storage.local.get(key);
   return result[key];
-}
-
-/**
-* Removes a key/value pair from the storage.
-* @param {string} key The key to remove.
-*/
-function remove(key) {
-  browser.storage.local.remove(key);
 }
 
 /**
@@ -87,9 +78,9 @@ async function getCurrentSession() {
 */
 async function saveSession(sessionName) {
   const tabs = await browser.tabs.query({ currentWindow: true });
-  set(sessionName, tabs);
-  setWindowSession(sessionName);
-  await push('sessionNames', sessionName);
+  await set(sessionName, tabs);
+  await setWindowSession(sessionName);
+  await push(sessionsList, sessionName);
   displayTabs();
   displaySessions();
 }
@@ -123,6 +114,8 @@ async function openSession(sessionName) {
   setWindowSession(sessionName);
   displayTabs();
 
+  
+
   isUpdating = false;
 }
 
@@ -142,7 +135,6 @@ async function closeTabs(tabs) {
 */
 async function openTabs(tabs) {
   for (const tab of tabs) {
-    push('sessionNames', tab.url);
     await browser.tabs.create({
         url: tab.url
     });
@@ -154,6 +146,9 @@ async function openTabs(tabs) {
 * @param {number} tabId The id of the tab.
 */
 async function updateStorageTab(tabId) {
+  if (isUpdating) {
+    return;
+  }
   const sessionName = await getCurrentSession();
   const [tabs, updatedTab] = await Promise.all([
     getList(sessionName), 
@@ -172,6 +167,9 @@ async function updateStorageTab(tabId) {
 * @param {browser.tabs.Tab} tab The tab to create.
 */
 async function createStorageTab(tab) {
+  if (isUpdating) {
+    return;
+  }
   const sessionName = await getCurrentSession();
   push(sessionName, tab);
   displayTabs();
@@ -182,6 +180,9 @@ async function createStorageTab(tab) {
 * @param {number} tabId The id of the tab.
 */
 async function removeStorageTab(tabId) {
+  if (isUpdating) {
+    return;
+  }
   const sessionName = await getCurrentSession();
   const tabs = await getList(sessionName);
   const filteredTabs = tabs.filter(tab => tab.id !== tabId);
@@ -218,7 +219,7 @@ async function displayTabs() {
 */
 async function displaySessions() {
   const sessionName = await getCurrentSession();
-  const sessionNames = await getList('sessionNames');
+  const sessionNames = await getList(sessionsList);
   browser.runtime.sendMessage({type: 'displaySessions', sessions: sessionNames, highlightedSession: sessionName});
 }
 
