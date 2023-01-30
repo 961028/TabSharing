@@ -1,14 +1,17 @@
 const currentSession = 'CurrentSession';
 const sessionsList = 'Sessions';
 
+const local = {};
+
 /**
 * Sets a key/value pair in the storage.
 * @param {string} key The key to set.
 * @param {any} value The value to set.
 */
 function set(key, value) {
-  const data = { [key]: value };
-  browser.storage.local.set(data);
+  //const data = { [key]: value };
+  //browser.storage.local.set(data);
+  local[key] = value;
 }
 
 /**
@@ -17,8 +20,9 @@ function set(key, value) {
 * @returns {Promise<any>} The value.
 */
 async function get(key) {
-  const result = await browser.storage.local.get(key);
-  return result[key];
+  //const result = await browser.storage.local.get(key);
+  //return result[key];
+  return local[key];
 }
 
 /**
@@ -69,7 +73,11 @@ async function setWindowSession(name) {
 * @returns {Promise<string>} The name of the session.
 */
 async function getCurrentSession() {
-  return await get(currentSession);
+  let session = await get(currentSession);
+  if (!session) {
+    setWindowSession('Unnamed Session');
+  }
+  return session;
 }
 
 /**
@@ -91,9 +99,6 @@ async function saveSession(sessionName) {
 */
 let isUpdating = false;
 async function openSession(sessionName) {
-  if (isUpdating) {
-    return;
-  }
   isUpdating = true;
   /*
   const windowSession = await getCurrentSession();
@@ -218,9 +223,9 @@ async function displayTabs() {
 * Displays the sessions in the popup.
 */
 async function displaySessions() {
-  const sessionName = await getCurrentSession();
-  const sessionNames = await getList(sessionsList);
-  browser.runtime.sendMessage({type: 'displaySessions', sessions: sessionNames, highlightedSession: sessionName});
+  const currentSessionName = await getCurrentSession();
+  const allSessionNames = await getList(sessionsList);
+  browser.runtime.sendMessage({type: 'displaySessions', sessions: allSessionNames, highlightedSession: currentSessionName});
 }
 
 /**
@@ -237,3 +242,4 @@ browser.tabs.onRemoved.addListener(removeStorageTab);
 
 displayTabs();
 displaySessions();
+saveSession();
