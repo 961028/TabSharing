@@ -1,7 +1,16 @@
 const currentSession = 'CurrentSession';
 const sessionsList = 'Sessions';
 
-const local = {};
+const local = {
+  work: {
+    tabId1: {title: "example", url: "www.example.com"},
+    tabId2: {title: "example", url: "www.example.com"}
+  },
+  school: {
+    tabId1: {title: "example", url: "www.example.com"},
+    tabId2: {title: "example", url: "www.example.com"}
+  }
+};
 
 /**
 * Sets a key/value pair in the storage.
@@ -159,6 +168,8 @@ async function openTabs(tabs) {
   }
 }
 
+/* ---- LISTENER FUNCTIONS ---- */
+
 /**
 * Updates a tab in the storage.
 * @param {number} tabId The id of the tab.
@@ -207,6 +218,8 @@ async function removeStorageTab(tabId) {
   set(sessionName, filteredTabs);
   displayTabs();
 }
+
+/* ---- LISTENERS AND MESSAGING ---- */
 
 browser.runtime.onMessage.addListener(data => {
   switch (data.type) {
