@@ -1,26 +1,15 @@
 const currentSession = 'CurrentSession';
 const sessionsList = 'Sessions';
 
-const local = {
-  work: {
-    tabId1: {title: "example", url: "www.example.com"},
-    tabId2: {title: "example", url: "www.example.com"}
-  },
-  school: {
-    tabId1: {title: "example", url: "www.example.com"},
-    tabId2: {title: "example", url: "www.example.com"}
-  }
-};
-
 /**
 * Sets a key/value pair in the storage.
 * @param {string} key The key to set.
 * @param {any} value The value to set.
 */
 function set(key, value) {
-  //const data = { [key]: value };
-  //browser.storage.local.set(data);
-  local[key] = value;
+  const data = { [key]: value };
+  browser.storage.local.set(data);
+  //local[key] = value;
 }
 
 /**
@@ -29,9 +18,9 @@ function set(key, value) {
 * @returns {Promise<any>} The value.
 */
 async function get(key) {
-  //const result = await browser.storage.local.get(key);
-  //return result[key];
-  return local[key];
+  const result = await browser.storage.local.get(key);
+  return result[key];
+  //return local[key];
 }
 
 /**
@@ -121,6 +110,7 @@ async function saveSession(sessionName) {
 */
 let isUpdating = false;
 async function openSession(sessionName) {
+  if (isUpdating) return;
   isUpdating = true;
   /*
   const windowSession = await getCurrentSession();
@@ -133,15 +123,13 @@ async function openSession(sessionName) {
     }
   }
 */
-  //const tabs = await browser.tabs.query({ currentWindow: true });
-  //closeTabs(tabs);
-  const newTabs = await getList(sessionName);
-  openTabs(newTabs);
+  const tabs = await browser.tabs.query({ currentWindow: true });
+  let newTabs = await getList(sessionName);
+  await openTabs(newTabs);
+  await closeTabs(tabs);
 
-  setWindowSession(sessionName);
+  await setWindowSession(sessionName);
   displayTabs();
-
-  
 
   isUpdating = false;
 }
@@ -162,7 +150,7 @@ async function closeTabs(tabs) {
 */
 async function openTabs(tabs) {
   for (const tab of tabs) {
-    await browser.tabs.create({
+    browser.tabs.create({
         url: tab.url
     });
   }
@@ -175,9 +163,7 @@ async function openTabs(tabs) {
 * @param {number} tabId The id of the tab.
 */
 async function updateStorageTab(tabId) {
-  if (isUpdating) {
-    return;
-  }
+  if (isUpdating) return;
   const sessionName = await getCurrentSession();
   const [tabs, updatedTab] = await Promise.all([
     getList(sessionName), 
@@ -196,9 +182,7 @@ async function updateStorageTab(tabId) {
 * @param {browser.tabs.Tab} tab The tab to create.
 */
 async function createStorageTab(tab) {
-  if (isUpdating) {
-    return;
-  }
+  if (isUpdating) return;
   const sessionName = await getCurrentSession();
   push(sessionName, tab);
   displayTabs();
@@ -209,9 +193,7 @@ async function createStorageTab(tab) {
 * @param {number} tabId The id of the tab.
 */
 async function removeStorageTab(tabId) {
-  if (isUpdating) {
-    return;
-  }
+  if (isUpdating) return;
   const sessionName = await getCurrentSession();
   const tabs = await getList(sessionName);
   const filteredTabs = tabs.filter(tab => tab.id !== tabId);
@@ -241,6 +223,7 @@ browser.runtime.onMessage.addListener(data => {
 */
 async function displayTabs() {
   const sessionName = await getCurrentSession();
+  if (!sessionName) return;
   const tabs = await getList(sessionName);
   browser.runtime.sendMessage({type: 'displayTabs', tabs: tabs});
 }
@@ -249,8 +232,9 @@ async function displayTabs() {
 * Displays the sessions in the popup.
 */
 async function displaySessions() {
-  const currentSessionName = await getCurrentSession();
   const allSessionNames = await getList(sessionsList);
+  if(!allSessionNames) return;
+  const currentSessionName = await getCurrentSession();
   browser.runtime.sendMessage({type: 'displaySessions', sessions: allSessionNames, highlightedSession: currentSessionName});
 }
 
@@ -262,10 +246,13 @@ function popup(message) {
   browser.runtime.sendMessage({type: 'popup', message: message});
 }
 
+function clearMemory() {
+  browser.runtime.sendMessage({type: 'popup', message: message});
+}
+
 browser.tabs.onUpdated.addListener(updateStorageTab);
 browser.tabs.onCreated.addListener(createStorageTab);
 browser.tabs.onRemoved.addListener(removeStorageTab);
 
 displayTabs();
 displaySessions();
-saveSession();
