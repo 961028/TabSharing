@@ -96,10 +96,12 @@ async function getCurrentSession() {
 * @param {string} sessionName The name of the session.
 */
 async function saveSession(sessionName) {
+  const sessions = await getList(sessionsList);
+  if(sessions.includes(sessionName)) return;
   const tabs = await browser.tabs.query({ currentWindow: true });
   await set(sessionName, tabs);
   await setWindowSession(sessionName);
-  await push(sessionsList, sessionName);
+  //await push(sessionsList, sessionName);
   displayTabs();
   displaySessions();
 }
@@ -233,7 +235,7 @@ async function displayTabs() {
 */
 async function displaySessions() {
   const allSessionNames = await getList(sessionsList);
-  if(!allSessionNames) return;
+  if(allSessionNames === []) return;
   const currentSessionName = await getCurrentSession();
   browser.runtime.sendMessage({type: 'displaySessions', sessions: allSessionNames, highlightedSession: currentSessionName});
 }
@@ -243,10 +245,6 @@ async function displaySessions() {
 * @param {string} message The message to display.
 */
 function popup(message) {
-  browser.runtime.sendMessage({type: 'popup', message: message});
-}
-
-function clearMemory() {
   browser.runtime.sendMessage({type: 'popup', message: message});
 }
 

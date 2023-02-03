@@ -1,18 +1,14 @@
 const currentSession = 'CurrentSession';
 const sessionsList = 'Sessions';
 
-const local = {};
-
 function set(key, value) {
-  //const data = { [key]: value };
-  //browser.storage.sync.set(data);
-  local[key] = value;
+  const data = { [key]: value };
+  browser.storage.sync.set(data);
 }
 
 async function get(key) {
-  //const result = await browser.storage.sync.get(key);
-  //return result[key];
-  return local[key];
+  const result = await browser.storage.sync.get(key);
+  return result[key];
 }
 
 async function createSyncTab(session, title, url) {
