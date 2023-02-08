@@ -1,9 +1,3 @@
-async function generateStorageTab(tab) {
-    let storageTab = { title: tab.title, url: tab.url };
-    storageTab.storageId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-    return storageTab;
-}
-
 /**
 * Saves the current window session.
 * @param {string} sessionName The name of the session.
@@ -80,3 +74,20 @@ function compareTabs(oldTabs, newTabs) {
   
     return { created, removed, updated };
   }
+
+async function createTabFromStorage(tab) {
+    createdTab = await browser.tabs.create({
+        url: tab.url
+    });
+    browser.sessions.setTabValue(
+        createdTab.id,
+        'storageId',
+        tab.storageId
+    );      
+}
+
+async function generateStorageTab(tab) {
+    let storageTab = { title: tab.title, url: tab.url };
+    storageTab.storageId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    return storageTab;
+}
