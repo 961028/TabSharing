@@ -4,7 +4,7 @@
 */
 async function saveSession(sessionName) {
 
-    let sessions = await browser.storage.local.get() || [];
+    let sessions = await browser.storage.sync.get() || [];
     sessions.forEach(session => {
         if (sessionName === session) return;
     });
@@ -16,7 +16,7 @@ async function saveSession(sessionName) {
         storageTabs.push(storageTab);
     });
 
-    await browser.storage.local.set(sessionName, storageTabs);
+    await browser.storage.sync.set(sessionName, storageTabs);
     
     let currentWindow = await browser.windows.getLastFocused();
     await browser.sessions.setWindowValue(currentWindow.id, 'currentSession', sessionName);
@@ -29,13 +29,13 @@ async function storageUpdate(changes) {
     let changedItems = Object.keys(changes);
 
     for (const key of changedItems) {
-        let currentValue = await browser.storage.local.get(key);
+        let currentValue = await browser.storage.sync.get(key);
         let newValue = changes[key].newValue;
         if (currentValue !== newValue) {
-            await browser.storage.local.set(key, newValue);
+            await browser.storage.sync.set(key, newValue);
                     
             const newTabs = newValue.filter(tab => {
-                return !(browser.storage.local.get(tab.storageId));
+                return !(browser.storage.sync.get(tab.storageId));
             });
             
             if (newTabs.length > 0) {
@@ -79,6 +79,7 @@ async function createTabFromStorage(tab) {
     createdTab = await browser.tabs.create({
         url: tab.url
     });
+    // wrong place
     browser.sessions.setTabValue(
         createdTab.id,
         'storageId',
