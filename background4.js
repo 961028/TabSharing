@@ -1,23 +1,38 @@
 /* ---------------------------------- GET & SET ---------------------------------- */
 
 async function get(key) {
-    const result = await browser.storage.local.get(key);
+    let result = await browser.storage.local.get(key);
     return result.key;
-  }
-
-function set(key, value) {
-    browser.storage.local.set({ [key]: value });
 }
 
-async function getCurrentSession() {
+async function set(key, value) {
+    await browser.storage.local.set({ [key]: value });
+}
+
+async function getCurrentWindowSessionName() {
     let currentWindow = await browser.windows.getLastFocused();
     let currentSession =  await browser.sessions.getWindowValue(currentWindow.id, 'session');
     return currentSession;
 }
 
-async function setCurrentSession(sessionName) {
+async function setCurrentWindowSessionName(sessionName) {
     let currentWindow = await browser.windows.getLastFocused();
     await browser.sessions.setWindowValue(currentWindow.id, 'session', sessionName);
+}
+
+async function getTabStorageId(tabId) {
+    return await browser.sessions.getTabValue(
+        tabId,
+        'storageId'
+    );
+}
+
+async function setTabStorageId(tabId, tabStorageId) {
+    await browser.sessions.setTabValue(
+        tabId,
+        'storageId',
+        tabStorageId
+    );
 }
 
 /* ---------------------------------- STUFF ---------------------------------- */
@@ -25,13 +40,8 @@ async function setCurrentSession(sessionName) {
 function tabCreatedLocally(tab) {
     storageListenerEnabled = false;
     storageTab = prepareNewTabForStorage(tab);
-    addTabToCurrentSessionStorage(storageTab);
+    addStorageTabToCurrentSessionStorage(storageTab);
     storageListenerEnabled = true;
-}
-
-function addTabToCurrentSessionStorage(storageTab) {
-    currentSession = getCurrentSession();
-    set(currentSession, storageTab);
 }
 
 // A new tab has been created remotely.
@@ -45,8 +55,9 @@ function addTabToCurrentSessionStorage(storageTab) {
 function tabCreatedRemotely(storageTab) {
     storageListenerEnabled = false;
     tabsCreatedListenerEnabled = false;
-    addTabToCurrentSessionStorage(storageTab);
-    createTabFromStorage(storageTab);
+    addStorageTabToCurrentSessionStorage(storageTab);
+    let newTab = createNewTabInCurrentWindow(storageTab.url);
+    
     tabsCreatedListenerEnabled = true;
     storageListenerEnabled = true;
 }
@@ -58,10 +69,8 @@ function tabCreatedRemotely(storageTab) {
 
 function tabRemovedLocally(tabId) {
     storageListenerEnabled = false;
-    tabsCreatedListenerEnabled = false;
-    addTabToCurrentSessionStorage(storageTab);
-    createTabFromStorage(storageTab);
-    tabsCreatedListenerEnabled = true;
+    storageId = getTabStorageId(tabId);
+    removeTabFromStorage(storageId);
     storageListenerEnabled = true;
 }
 
@@ -92,6 +101,13 @@ function tabRemovedLocally(tabId) {
 
 /* ---------------------------------- TAB MODIFICATION ---------------------------------- */
 
+async function addStorageTabToCurrentSessionStorage(storageTab) {
+    currentSession = await getCurrentWindowSessionName();
+    let session = await get(currentSession);
+    session[storageTab.storageId] = storageTab;
+    set(currentSession, tabs);
+}
+
 function prepareNewTabForStorage(tab) {
     let sId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
     let storageTab = { title: tab.title, url: tab.url, storageId: sId };
@@ -99,19 +115,17 @@ function prepareNewTabForStorage(tab) {
     return storageTab;
 }
 
-async function createTabFromStorage(storageTab) {
-    tab = await browser.tabs.create({
+async function createNewTabInCurrentWindow(storageTab) {
+    newTab = await browser.tabs.create({
         url: storageTab.url
     });
-    setTabStorageId(tab.id, storageTab.storageId);
+    setTabStorageId(newTab.id, storageTab.storageId);
 }
 
-function setTabStorageId(tabId, tabStorageId) {
-    browser.sessions.setTabValue(
-        tabId,
-        'storageId',
-        tabStorageId
-    );
+async function removeTabFromStorage(storageId) {
+    currentSession = await getCurrentWindowSessionName();
+    let session = await get(currentSession);
+    delete session[storageId];
 }
 
 /* ---------------------------------- LISTENERS ---------------------------------- */
