@@ -1,12 +1,37 @@
-function tabCreatedLocally(tab) {
-    disableStorageListener();
-    tab = prepareNewTabForStorage(tab);
-    addTabToSession(tab);
-    enableStorageListener();
+/* ---------------------------------- GET & SET ---------------------------------- */
+
+async function get(key) {
+    const result = await browser.storage.local.get(key);
+    return result.key;
+  }
+
+function set(key, value) {
+    browser.storage.local.set({ [key]: value });
 }
 
-function addTabToSession(tab) {
-    
+async function getCurrentSession() {
+    let currentWindow = await browser.windows.getLastFocused();
+    let currentSession =  await browser.sessions.getWindowValue(currentWindow.id, 'session');
+    return currentSession;
+}
+
+async function setCurrentSession(sessionName) {
+    let currentWindow = await browser.windows.getLastFocused();
+    await browser.sessions.setWindowValue(currentWindow.id, 'session', sessionName);
+}
+
+/* ---------------------------------- STUFF ---------------------------------- */
+
+function tabCreatedLocally(tab) {
+    storageListenerEnabled = false;
+    storageTab = prepareNewTabForStorage(tab);
+    addTabToCurrentSessionStorage(storageTab);
+    storageListenerEnabled = true;
+}
+
+function addTabToCurrentSessionStorage(storageTab) {
+    currentSession = getCurrentSession();
+    set(currentSession, storageTab);
 }
 
 // A new tab has been created remotely.
@@ -17,10 +42,28 @@ function addTabToSession(tab) {
 // Reactivate the listener for storage updates.
 // Reactivate the listener for creating tabs.
 
+function tabCreatedRemotely(storageTab) {
+    storageListenerEnabled = false;
+    tabsCreatedListenerEnabled = false;
+    addTabToCurrentSessionStorage(storageTab);
+    createTabFromStorage(storageTab);
+    tabsCreatedListenerEnabled = true;
+    storageListenerEnabled = true;
+}
+
 // A tab has been removed locally.
 // Temporarily disable the listener for storage updates.
 // Remove the tab from the sync storage.
 // Reactivate the listener for storage updates.
+
+function tabRemovedLocally(tabId) {
+    storageListenerEnabled = false;
+    tabsCreatedListenerEnabled = false;
+    addTabToCurrentSessionStorage(storageTab);
+    createTabFromStorage(storageTab);
+    tabsCreatedListenerEnabled = true;
+    storageListenerEnabled = true;
+}
 
 // A tab has been removed remotely.
 // Temporarily disable the listener for removing tabs.
@@ -47,15 +90,28 @@ function addTabToSession(tab) {
 // Turn off all listeners.
 // Check 
 
+/* ---------------------------------- TAB MODIFICATION ---------------------------------- */
+
 function prepareNewTabForStorage(tab) {
     let sId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-    let storageReadyTab = { title: tab.title, url: tab.url, storageId: sId };
+    let storageTab = { title: tab.title, url: tab.url, storageId: sId };
+    setTabStorageId(tab.id, sId);
+    return storageTab;
+}
+
+async function createTabFromStorage(storageTab) {
+    tab = await browser.tabs.create({
+        url: storageTab.url
+    });
+    setTabStorageId(tab.id, storageTab.storageId);
+}
+
+function setTabStorageId(tabId, tabStorageId) {
     browser.sessions.setTabValue(
-        tab.id,
+        tabId,
         'storageId',
-        sId
+        tabStorageId
     );
-    return storageReadyTab;
 }
 
 /* ---------------------------------- LISTENERS ---------------------------------- */
@@ -70,8 +126,6 @@ function storageListener(changes) {
         // Todo
     }
 }
-function disableStorageListener() {storageListenerEnabled = false}
-function enableStorageListener() {storageListenerEnabled = true}
 
 /**
  * Register tab update event listener
@@ -83,8 +137,6 @@ function tabsUpdatedListener(tabId, changeInfo, tabInfo) {
         // Todo
     }
 }
-function disableTabsUpdatedListener() {tabsUpdatedListenerEnabled = false}
-function enableTabsUpdatedListener() {tabsUpdatedListenerEnabled = true}
 
 /**
  * Register tab creation event listener
@@ -96,8 +148,6 @@ function tabsCreatedListener(tab) {
         tabCreatedLocally(tab);
     }
 }
-function disableTabsCreatedListener() {tabsCreatedListenerEnabled = false}
-function enableTabsCreatedListener() {tabsCreatedListenerEnabled = true}
 
 /**
  * Register tab removal event listener
@@ -109,5 +159,3 @@ function tabsRemovedListener(tabId, removeInfo) {
         // Todo
     }
 }
-function disableTabsRemovedListener() {tabsRemovedListenerEnabled = false}
-function enableTabsRemovedListener() {tabsRemovedListenerEnabled = true}
