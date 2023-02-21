@@ -9,15 +9,28 @@ async function set(key, value) {
     await browser.storage.local.set({ [key]: value });
 }
 
-async function getCurrentWindowSessionName() {
-    let currentWindow = await browser.windows.getLastFocused();
-    let currentSession =  await browser.sessions.getWindowValue(currentWindow.id, 'session');
+async function getCurrentWindow() {
+    return await browser.windows.getLastFocused();
+}
+
+async function getSessionIdByWindowId(windowId) {
+    let currentSession = await browser.sessions.getWindowValue(windowId, 'session');
     return currentSession;
 }
 
-async function setCurrentWindowSessionName(sessionName) {
-    let currentWindow = await browser.windows.getLastFocused();
-    await browser.sessions.setWindowValue(currentWindow.id, 'session', sessionName);
+async function setSessionIdByWindowId(windowId, sessionId) {
+    browser.sessions.setWindowValue(windowId, 'session', sessionId);
+}
+
+async function getCurrentWindowSessionId() {
+    let currentWindow = await getCurrentWindow();
+    let currentSession = await getSessionIdByWindowId(currentWindow.id)
+    return currentSession;
+}
+
+async function setCurrentWindowSessionId(sessionId) {
+    let currentWindow = await getCurrentWindow();
+    await setSessionIdByWindowId(currentWindow.id, sessionId);
 }
 
 async function getTabStorageId(tabId) {
@@ -35,20 +48,63 @@ async function setTabStorageId(tabId, tabStorageId) {
     );
 }
 
-async function findByStorageId(storageId) {
+async function findWindowBySessionId(sessionId) {
+    let windows = await browser.windows.getAll({
+        windowTypes: ["normal"]
+    });
+    for (let window of windows) {
+        let windowSessionId = getSessionIdByWindowId(window.id);
+        if (windowSessionId == sessionId) {
+            return window;
+        }
+    }
+    return null;
+}
+
+async function findTabByStorageId(storageId) {
     let windows = await browser.windows.getAll({
       populate: true,
-      windowTypes: ["normal"],
+      windowTypes: ["normal"]
     });
     for (let window of windows) {
         for (let tab of window.tabs) {
             if (getTabStorageId(tab.id) == storageId) {
-                return tab.id;
+                return tab;
             }
         }
     }
     return null;
 }
+
+/* ---------------------------------- TAB MODIFICATION ---------------------------------- */
+
+async function addToSession(sessionId, storageTab) {
+    currentSession = await getCurrentWindowSessionId();
+    let session = await get(currentSession);
+    session[storageTab.storageId] = storageTab;
+    set(currentSession, tabs);
+}
+
+function prepareForStorage(newTab) {
+    let sId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    let storageTab = { title: newTab.title, url: newTab.url, storageId: sId };
+    setTabStorageId(newTab.id, sId);
+    return storageTab;
+}
+
+async function createInWindow(windowId, storageTab) {
+    newTab = await browser.tabs.create({
+        url: storageTab.url
+    });
+    setTabStorageId(newTab.id, storageTab.storageId);
+}
+
+async function removeFromStorage(windowId, storageId) {
+    currentSession = await getCurrentWindowSessionId();
+    let session = await get(currentSession);
+    delete session[storageId];
+}
+
 /* ---------------------------------- STUFF ---------------------------------- */
 
 // Window is saved by user.
@@ -62,10 +118,10 @@ async function findByStorageId(storageId) {
 // Store the new tab in the sync storage.
 // Reactivate the listener for storage updates.
 
-function newTabCreatedLocally(tab) {
+function tabCreatedLocally(tab) {
     storageListenerEnabled = false;
     let storageTab = prepareForStorage(tab);
-    addToSession(storageTab);
+    addToSession(sessionId, storageTab);
     storageListenerEnabled = true;
 }
 
@@ -77,10 +133,10 @@ function newTabCreatedLocally(tab) {
 // Reactivate the listener for storage updates.
 // Reactivate the listener for creating tabs.
 
-function newTabCreatedRemotely(storageTab) {
+function newTabCreatedRemotely(sessionId, storageTab) {
     storageListenerEnabled = false;
     tabsCreatedListenerEnabled = false;
-    addToSession(storageTab);
+    addToSession(sessionId, storageTab);
     createInWindow(storageTab);
     tabsCreatedListenerEnabled = true;
     storageListenerEnabled = true;
@@ -94,7 +150,7 @@ function newTabCreatedRemotely(storageTab) {
 function tabRemovedLocally(tabId) {
     storageListenerEnabled = false;
     let storageId = getTabStorageId(tabId);
-    removeFromStorage(storageId);
+    removeFromStorage(windowId, storageId);
     storageListenerEnabled = true;
 }
 
@@ -106,12 +162,13 @@ function tabRemovedLocally(tabId) {
 // Reactivate the listener for storage updates.
 // Reactivate the listener for removing tabs.
 
-function tabRemovedRemotely(storageId) {
+function tabRemovedRemotely(sessionId, storageId) {
     tabsRemovedListenerEnabled = false;
     storageListenerEnabled = false;
-    removeFromStorage(storageId);
-    let tabId = findByStorageId(storageId);
-    removeFromWindow(tabId);
+    let window = findWindowBySessionId(sessionId);
+    let tab = findTabByStorageId(storageId);
+    removeFromStorage(sessionId, storageId);
+    removeFromWindow(windowId, tab.id);
     storageListenerEnabled = true;
     tabsRemovedListenerEnabled = true;
 }
@@ -141,7 +198,7 @@ function tabUpdatedRemotely(storageId, storageTab) {
     tabsUpdatedListenerEnabled = false;
     storageListenerEnabled = false;
     updateSession(storageId, storageTab);
-    let tabId = findByStorageId(storageId);
+    let tabId = findTabByStorageId(storageId);
     updateInWindow(tabId, storageTab);
     storageListenerEnabled = true;
     tabsUpdatedListenerEnabled = true;
@@ -152,10 +209,10 @@ function tabUpdatedRemotely(storageId, storageTab) {
 // Store the session name in the sync storage.
 // Reactivate the listener for storage updates.
 
-function sessionSaved(sessionName) {
-    if (isNameTaken(sessionName)) return;
+function sessionSaved(sessionId) {
+    if (isIdTaken(sessionId)) return;
     storageListenerEnabled = false;
-    storageSession = prepareForStorage(sessionName);
+    storageSession = prepareForStorage(sessionId);
     setNewSession(storageSession);
     storageListenerEnabled = true;
 }
@@ -168,10 +225,10 @@ function sessionSaved(sessionName) {
 // Reactivate the listener for creating tabs.
 // Reactivate the listener for removing tabs.
 
-function sessionLoaded(sessionName) {
+function sessionLoaded(sessionId) {
     tabsRemovedListenerEnabled = false;
     tabsCreatedListenerEnabled = false;
-    storageSession = getSession(sessionName);
+    storageSession = getSession(sessionId);
     replaceWindow(storageSession);
     tabsCreatedListenerEnabled = true;
     tabsRemovedListenerEnabled = true;
@@ -182,9 +239,9 @@ function sessionLoaded(sessionName) {
 // Remove the session from the sync storage.
 // Reactivate the listener for storage updates.
 
-function sessionDeleted(sessionName) {
+function sessionDeleted(sessionId) {
     storageListenerEnabled = false;
-    storageSession = prepareForStorage(sessionName);
+    storageSession = prepareForStorage(sessionId);
     removeSession(storageSession);
     storageListenerEnabled = true;
 }
@@ -194,46 +251,17 @@ function sessionDeleted(sessionName) {
 // Rename the session in the sync storage.
 // Reactivate the listener for storage updates.
 
-function sessionRenamed(oldName, newName) {
-    if (isNameTaken(newName)) return;
+function sessionRenamed(oldId, newId) {
+    if (isIdTaken(newId)) return;
     storageListenerEnabled = false;
-    storageSession = prepareForStorage(oldName);
-    renameSession(storageSession, newName);
+    storageSession = prepareForStorage(oldId);
+    renameSession(storageSession, newId);
     storageListenerEnabled = true;
 }
 
 // User starts browser.
 // Turn off all listeners.
 // Check 
-
-/* ---------------------------------- TAB MODIFICATION ---------------------------------- */
-
-async function addToSession(storageTab) {
-    currentSession = await getCurrentWindowSessionName();
-    let session = await get(currentSession);
-    session[storageTab.storageId] = storageTab;
-    set(currentSession, tabs);
-}
-
-function prepareForStorage(newTab) {
-    let sId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-    let storageTab = { title: newTab.title, url: newTab.url, storageId: sId };
-    setTabStorageId(newTab.id, sId);
-    return storageTab;
-}
-
-async function createInWindow(storageTab) {
-    newTab = await browser.tabs.create({
-        url: storageTab.url
-    });
-    setTabStorageId(newTab.id, storageTab.storageId);
-}
-
-async function removeFromStorage(storageId) {
-    currentSession = await getCurrentWindowSessionName();
-    let session = await get(currentSession);
-    delete session[storageId];
-}
 
 /* ---------------------------------- LISTENERS ---------------------------------- */
 
@@ -266,7 +294,7 @@ browser.tabs.onCreated.addListener(tabsCreatedListener);
 let tabsCreatedListenerEnabled = true;
 function tabsCreatedListener(tab) {
     if(tabsCreatedListenerEnabled) {
-        newTabCreatedLocally(tab);
+        tabCreatedLocally(tab);
     }
 }
 
@@ -277,6 +305,6 @@ browser.tabs.onRemoved.addListener(tabsRemovedListener);
 let tabsRemovedListenerEnabled = true;
 function tabsRemovedListener(tabId, removeInfo) {
     if(tabsRemovedListenerEnabled) {
-        // Todo
+        tabRemovedLocally(tabId);
     }
 }
