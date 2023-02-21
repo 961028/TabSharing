@@ -32,7 +32,7 @@ async function setTabStorageId(tabId, tabStorageId) {
     );
 }
 
-async function findWindowBySessionId(sessionId) {
+async function getWindowBySessionId(sessionId) {
     let windows = await browser.windows.getAll({
         windowTypes: ["normal"]
     });
@@ -45,7 +45,7 @@ async function findWindowBySessionId(sessionId) {
     return null;
 }
 
-async function findTabByStorageId(storageTabId) {
+async function getTabByStorageId(storageTabId) {
     let windows = await browser.windows.getAll({
       populate: true,
       windowTypes: ["normal"]
@@ -62,10 +62,9 @@ async function findTabByStorageId(storageTabId) {
 
 /* ---------------------------------- TAB MODIFICATION ---------------------------------- */
 
-function prepareNewTabForStorage(newTab) {
-    let sId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-    let storageTab = { title: newTab.title, url: newTab.url, storageTabId: sId };
-    setTabStorageId(newTab.id, sId);
+function generateStorageTab(newTab) {
+    let storageId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    let storageTab = { title: newTab.title, url: newTab.url, storageId: storageId };
     return storageTab;
 }
 
@@ -78,6 +77,7 @@ async function addStorageTabToSessionStorage(sessionId, storageTab) {
 async function removeStorageTabFromSessionStorage(sessionId, storageTabId) {
     let session = await get(sessionId);
     delete session[storageTabId];
+    await set(sessionId, session);
 }
 
 async function createStorageTabInWindow(windowId, storageTab) {
@@ -94,9 +94,10 @@ async function createStorageTabInWindow(windowId, storageTab) {
 // Store the new tab in the sync storage.
 // Reactivate the listener for storage updates.
 
-function tabCreatedLocally(tab) {
+function tabCreatedLocally(sessionId, tab) {
     storageListenerEnabled = false;
-    let storageTab = prepareNewTabForStorage(tab);
+    let storageTab = generateStorageTab(tab);
+    setTabStorageId(tab.id, storageTab.storageId);
     addStorageTabToSessionStorage(sessionId, storageTab);
     storageListenerEnabled = true;
 }
@@ -141,8 +142,8 @@ function tabRemovedLocally(tabId) {
 function tabRemovedRemotely(sessionId, storageTabId) {
     tabsRemovedListenerEnabled = false;
     storageListenerEnabled = false;
-    let window = findWindowBySessionId(sessionId);
-    let tab = findTabByStorageId(storageTabId);
+    let window = getWindowBySessionId(sessionId);
+    let tab = getTabByStorageId(storageTabId);
     removeStorageTabFromSessionStorage(sessionId, storageTabId);
     removeFromWindow(windowId, tab.id);
     storageListenerEnabled = true;
@@ -157,7 +158,7 @@ function tabRemovedRemotely(sessionId, storageTabId) {
 function tabUpdatedLocally(tabId) {
     storageListenerEnabled = false;
     storageTabId = getTabStorageId(tabId);
-    storageTab = compressTab(tabId); //???
+    storageTab = generateStorageTab(tabId);
     updateSession(storageTabId, storageTab);
     storageListenerEnabled = true;
 }
@@ -174,7 +175,7 @@ function tabUpdatedRemotely(storageTabId, storageTab) {
     tabsUpdatedListenerEnabled = false;
     storageListenerEnabled = false;
     updateSession(storageTabId, storageTab);
-    let tabId = findTabByStorageId(storageTabId);
+    let tabId = getTabByStorageId(storageTabId);
     updateInWindow(tabId, storageTab);
     storageListenerEnabled = true;
     tabsUpdatedListenerEnabled = true;
@@ -188,7 +189,7 @@ function tabUpdatedRemotely(storageTabId, storageTab) {
 function sessionSaved(sessionId) {
     if (isIdTaken(sessionId)) return;
     storageListenerEnabled = false;
-    storageSession = prepareNewTabForStorage(sessionId);
+    //storageSession = generateStorageTab(sessionId);
     setNewSession(storageSession);
     storageListenerEnabled = true;
 }
@@ -217,7 +218,7 @@ function sessionLoaded(sessionId) {
 
 function sessionDeleted(sessionId) {
     storageListenerEnabled = false;
-    storageSession = prepareNewTabForStorage(sessionId);
+    //storageSession = generateStorageTab(sessionId);
     removeSession(storageSession);
     storageListenerEnabled = true;
 }
@@ -230,7 +231,7 @@ function sessionDeleted(sessionId) {
 function sessionRenamed(oldId, newId) {
     if (isIdTaken(newId)) return;
     storageListenerEnabled = false;
-    storageSession = prepareNewTabForStorage(oldId);
+    //storageSession = generateStorageTab(oldId);
     renameSession(storageSession, newId);
     storageListenerEnabled = true;
 }
