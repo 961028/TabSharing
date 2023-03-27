@@ -1,12 +1,21 @@
+<!DOCTYPE html>
 <html>
-  <body style="height: 500px">
-    <button id="save-button">Save Session</button>
-    <button id="open-button">Open Session</button>
-    <button id="refresh-button">Refresh</button>
-    <input id="name-input" type="text"></input>
-    <div id="tabs"></div>
-    <div id="sessions"></div>
-
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      /* Add your styles here */
+    </style>
+  </head>
+  <body>
+    <h1>TabSessionManager</h1>
+    <input type="text" id="sessionName" placeholder="Enter session name" />
+    <button id="saveBtn">Save current session</button>
+    <hr />
+    <select id="sessionsList">
+      <!-- Sessions will be populated here -->
+    </select>
+    <button id="restoreBtn">Restore session</button>
+    <button id="deleteBtn">Delete session</button>
     <script src="popup.js"></script>
   </body>
 </html>
