@@ -1,4 +1,4 @@
-export class StorageAPI {
+export class TabsAPI {
     
     async getCurrentTabs() {
         const tabs = await browser.tabs.query({currentWindow: true});

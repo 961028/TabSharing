@@ -1,8 +1,3 @@
-import { StorageAPI } from './utils/StorageAPI.js';
-import { Mediator } from './utils/Mediator.js';
-const storageAPI = new StorageAPI();
-const mediator = new Mediator();
-
 async function init() {
   populateSessionList();
   elements.saveBtn.addEventListener('click', saveCurrentSession);
@@ -10,18 +5,17 @@ async function init() {
 }
 
 const elements = {
-  sessionName: document.getElementById('sessionName'),
-  sessionList: document.getElementById('sessionList'),
-  saveBtn: document.getElementById('saveBtn'),
-  restoreBtn: document.getElementById('restoreBtn'),
-  deleteBtn: document.getElementById('deleteBtn'),
-  clearBtn: document.getElementById('clearBtn')
+  sessionName:  document.getElementById('sessionName'),
+  sessionList:  document.getElementById('sessionList'),
+  saveBtn:      document.getElementById('saveBtn'),
+  restoreBtn:   document.getElementById('restoreBtn'),
+  deleteBtn:    document.getElementById('deleteBtn'),
+  clearBtn:     document.getElementById('clearBtn')
 };
 
 async function saveCurrentSession() {
   const sessionName = elements.sessionName.value || 'Unnamed Session';
   elements.sessionName.value = '';
-  //await storage.addToList('sessions', sessionName);
   await messagingAPI.saveCurrentSession(sessionName);
   populateSessionList();
 }
@@ -41,9 +35,46 @@ async function populateSessionList() {
 function clearStorage() {
   messagingAPI.saveCurrentSession("testA");
   messagingAPI.restoreSession("testB");
-  mediator.saveSession("testC");
-  //browser.storage.sync.clear();
+  browser.storage.sync.clear();
   //populateSessionList();
+}
+
+const storageAPI = {
+    
+  async get(key) {
+      let result = await browser.storage.sync.get(key);
+      return result[key];
+  },
+
+  async set(key, value) {
+      let obj = {};
+      obj[key] = value;
+      await browser.storage.sync.set(obj);
+  },
+
+  async remove(key) {
+      await browser.storage.sync.remove(key);
+  },
+
+  async getList(key) {
+      let result = await browser.storage.sync.get(key);
+      return result[key] || [];
+  },
+
+  async addToList(key, value) {
+      let list = await this.getList(key);
+      list.push(value);
+      await this.set(key, list);
+  },
+
+  async removeFromList(key, value) {
+      let list = await this.getList(key);
+      let index = list.indexOf(value);
+      if (index > -1) {
+          list.splice(index, 1);
+          await this.set(key, list);
+      }
+  }
 }
 
 const messagingAPI = {

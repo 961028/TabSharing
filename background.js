@@ -1,8 +1,3 @@
-//import { StorageAPI } from './utils/StorageAPI.js';
-//import { TabsAPI } from './utils/TabsAPI.js';
-//const storageAPI = new StorageAPI();
-//const tabsAPI = new TabsAPI();
-
 class TabSession {
   constructor(id, name, tabs) {
     this.id = id;
@@ -11,21 +6,20 @@ class TabSession {
   }
 }
 
-class TabSessionManager {
-  constructor() {
-    this.sessions = [];
-    this.activeSessionId = null;
-  }
+//const sessions = [];
+let activeSessionId = null;
+
+const tabSessionManager = {
 
   async saveCurrentSession(name) {
-    const tabs = await this.getCurrentTabs();
+    const tabs = await tabsAPI.getCurrentTabs();
     const id = this.generateId();
     const session = new TabSession(id, name, tabs);
 
-    this.sessions.push(session);
-    this.activeSessionId = id;
-    this.storeSessions();
-  }
+    //sessions.push(session);
+    activeSessionId = id;
+    this.storeSessions(session);
+  },
 
   async restoreSession(id) {
     const session = this.findSessionById(id);
@@ -33,54 +27,108 @@ class TabSessionManager {
       return;
     }
 
-    await this.closeCurrentTabs();
-    await this.openTabs(session.tabs);
+    await tabsAPI.closeCurrentTabs();
+    await tabsAPI.openTabs(session.tabs);
 
-    this.activeSessionId = id;
-  }
+    activeSessionId = id;
+  },
 
   async updateActiveSession() {
-    if (!this.activeSessionId) {
+    if (!activeSessionId) {
       return;
     }
 
-    const session = this.findSessionById(this.activeSessionId);
+    const session = this.findSessionById(activeSessionId);
     if (!session) {
       return;
     }
 
-    session.tabs = await this.getCurrentTabs();
+    session.tabs = await tabsAPI.getCurrentTabs();
     this.storeSessions();
-  }
+  },
 
   findSessionById(id) {
-    return this.sessions.find(session => session.id === id);
-  }
+    const sessions = storageAPI.getList();
+    return sessions.find(session => session.id === id);
+  },
 
   generateId() {
     return Date.now().toString(36);
-  }
+  },
 
-  async storeSessions() {
-    await browser.storage.local.set({sessions: this.sessions});
-  }
+  async storeSessions(session) {
+    await storageAPI.addToList('sessions', session);
+  },
 
-  async loadSessions() {
-    const data = await browser.storage.local.get('sessions');
-    if (data.sessions) {
-      this.sessions = data.sessions.map(session => new TabSession(session.id, session.name, session.tabs));
+  async getSessions() {
+    const sessions = await storageAPI.getList('sessions');
+    if (sessions) {
+      return data.sessions.map(session => new TabSession(session.id, session.name, session.tabs));
     }
   }
 }
 
-const tabSessionManager = new TabSessionManager();
-tabSessionManager.loadSessions();
+const tabsAPI = {
+
+  async getCurrentTabs() {
+    const tabs = await browser.tabs.query({currentWindow: true});
+    return tabs.map(({url, title}) => ({url, title}));
+  },
+
+  async closeCurrentTabs() {
+    const tabs = await this.getCurrentTabs();
+    const tabIds = tabs.map(({id}) => id);
+    await browser.tabs.remove(tabIds);
+  },
+
+  async openTabs(tabData) {
+    tabData.map(({url}) => browser.tabs.create({url}));
+  }
+}
+
+const storageAPI = {
+
+  async get(key) {
+    let result = await browser.storage.sync.get(key);
+    return result[key];
+  },
+
+  async set(key, value) {
+    let obj = {};
+    obj[key] = value;
+    await browser.storage.sync.set(obj);
+  },
+
+  async remove(key) {
+    await browser.storage.sync.remove(key);
+  },
+
+  async getList(key) {
+    let result = await browser.storage.sync.get(key);
+    return result || [];
+  },
+
+  async addToList(key, value) {
+    let list = await this.getList(key);
+    list.push(value);
+    await this.set(key, list);
+  },
+
+  async removeFromList(key, value) {
+    let list = await this.getList(key);
+    let index = list.indexOf(value);
+    if (index > -1) {
+      list.splice(index, 1);
+      await this.set(key, list);
+    }
+  }
+}
 
 const messagingAPI = {
   async saveSession({ sessionName }) {
     try {
-      console.log('test1: ' + sessionName);
-      //await tabSessionManager.saveCurrentSession(sessionName);
+      //console.log('test1: ' + sessionName);
+      await tabSessionManager.saveCurrentSession(sessionName);
     } catch (error) {
       console.error(`Failed to save session: ${error}`);
     }
