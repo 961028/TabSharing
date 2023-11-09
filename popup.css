@@ -1,0 +1,161 @@
+* {
+    box-sizing: border-box;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    color: #fff;
+    font-size: 16px;
+  }
+  
+  body {
+    width: 400px;
+    background: rgba(28, 27, 34, 1);
+    padding: 32px;
+  }
+  
+  .context-menu {
+    display: none;
+    position: absolute;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background-color: rgba(43, 42, 51, 1);
+  }
+  
+  .context-menu-item {
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  
+  .context-menu-item:hover {
+    background-color: rgba(66, 65, 77, 1);
+  }
+  
+  .textbox-with-button {
+    display: flex;
+    gap: 8px;
+  }
+  
+  input {
+    background: rgba(28, 27, 34, 1);
+    flex: 1;
+    padding: 8px 12px;
+    border-radius: 4px;
+    border: none;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+  }
+  
+  input:focus {
+    outline: 2px solid rgba(0, 221, 255, 1);
+  }
+  
+  button {
+    background: rgba(28, 27, 34, 1);
+    padding: 12px;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+  }
+  
+  button:hover {
+    background: rgba(43, 42, 51, 1);
+  }
+  
+  button:active {
+    background: rgba(66, 65, 77, 1);
+  }
+  
+  #tagsList {
+    display: flex;
+    flex-wrap: wrap;
+    margin: 8px 0px;
+    gap: 8px;
+  }
+  
+  .tag {
+    background: rgba(35, 34, 43);
+    display: inline-block;
+    text-align: center;
+    user-select: none;
+    padding: 2px 12px 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    max-width: 100%;
+    min-width: 20%
+  }
+  
+  .tag:hover {
+    background: rgba(43, 42, 51, 1);
+  }
+  
+  .tag.selected {
+    background: rgba(66, 65, 77, 1);
+    box-shadow: 0px 0px 12px rgba(0, 0, 0, 0.25);
+  }
+  
+  .tag:focus {
+    outline: 2px solid rgba(0, 221, 255, 1);
+  }
+  
+  .bookmark {
+    background: rgba(28, 27, 34, 1);
+    display: block;
+    padding: 12px;
+    margin-bottom: 8px;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+    text-decoration: none;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
+    user-select: none;
+  }
+  
+  .bookmark:hover {
+    background: rgba(43, 42, 51, 1);
+  }
+  
+  .bookmark:focus {
+    background: rgba(28, 27, 34, 1);
+  }
+  
+  .separator-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 8px 0;
+    margin-bottom: 8px;
+  }
+  
+  .separator {
+    display: block;
+    width: 100%;
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+  }
+  
+  .dropdown-container {
+    position: relative;
+  }
+  
+  .dropdown-menu {
+    display: none;
+    position: absolute;
+    top: 100;
+    right: 0;
+    z-index: 1;
+    transform: translateY(-40px);
+  }
+  
+  .dropdown-menu a {
+    padding: 8px 12px;
+    text-decoration: none;
+    display: block;
+  }
+  
+  .dropdown-menu a:hover {
+    background-color: #f1f1f1;
+  }

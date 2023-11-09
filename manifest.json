@@ -1,5 +1,5 @@
 {
-    "manifest_version": 2,
+    "manifest_version": 3,
     "name": "TabSharing",
     "version": "0.1",
   
@@ -22,8 +22,7 @@
         "tabs"
       ],
 
-      "browser_action": {
-        "browser_style": true,
+      "action": {
         "default_icon": "run.png",
         "default_title": "Session Manager",
         "default_popup": "popup.html"

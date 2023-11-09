@@ -1,69 +1,107 @@
-const sessions = new Map();
+//import { StorageAPI } from './utils/StorageAPI.js';
+//import { TabsAPI } from './utils/TabsAPI.js';
+//const storageAPI = new StorageAPI();
+//const tabsAPI = new TabsAPI();
 
-function generateTemporaryName() {
-  const timestamp = new Date().toISOString();
-  return `Session_${timestamp}`;
+class TabSession {
+  constructor(id, name, tabs) {
+    this.id = id;
+    this.name = name;
+    this.tabs = tabs;
+  }
 }
 
-async function saveSession(sessionName, tabs) {
-  const session = { name: sessionName, tabs: tabs };
-  sessions.set(sessionName, session);
-  return session;
-}
+class TabSessionManager {
+  constructor() {
+    this.sessions = [];
+    this.activeSessionId = null;
+  }
 
-async function getSession(sessionName) {
-  return sessions.get(sessionName);
-}
+  async saveCurrentSession(name) {
+    const tabs = await this.getCurrentTabs();
+    const id = this.generateId();
+    const session = new TabSession(id, name, tabs);
 
-async function getSessions() {
-  return Array.from(sessions.values());
-}
+    this.sessions.push(session);
+    this.activeSessionId = id;
+    this.storeSessions();
+  }
 
-async function deleteSession(sessionName) {
-  return sessions.delete(sessionName);
-}
+  async restoreSession(id) {
+    const session = this.findSessionById(id);
+    if (!session) {
+      return;
+    }
 
-function updateTabInSession(sessionName, tabId, updatedProperties) {
-  const session = sessions.get(sessionName);
-  if (session) {
-    const tabIndex = session.tabs.findIndex((tab) => tab.id === tabId);
-    if (tabIndex !== -1) {
-      session.tabs[tabIndex] = { ...session.tabs[tabIndex], ...updatedProperties };
+    await this.closeCurrentTabs();
+    await this.openTabs(session.tabs);
+
+    this.activeSessionId = id;
+  }
+
+  async updateActiveSession() {
+    if (!this.activeSessionId) {
+      return;
+    }
+
+    const session = this.findSessionById(this.activeSessionId);
+    if (!session) {
+      return;
+    }
+
+    session.tabs = await this.getCurrentTabs();
+    this.storeSessions();
+  }
+
+  findSessionById(id) {
+    return this.sessions.find(session => session.id === id);
+  }
+
+  generateId() {
+    return Date.now().toString(36);
+  }
+
+  async storeSessions() {
+    await browser.storage.local.set({sessions: this.sessions});
+  }
+
+  async loadSessions() {
+    const data = await browser.storage.local.get('sessions');
+    if (data.sessions) {
+      this.sessions = data.sessions.map(session => new TabSession(session.id, session.name, session.tabs));
     }
   }
 }
 
-function removeTabFromSession(sessionName, tabId) {
-  const session = sessions.get(sessionName);
-  if (session) {
-    session.tabs = session.tabs.filter((tab) => tab.id !== tabId);
-  }
-}
+const tabSessionManager = new TabSessionManager();
+tabSessionManager.loadSessions();
+
+const messagingAPI = {
+  async saveSession({ sessionName }) {
+    try {
+      console.log('test1: ' + sessionName);
+      //await tabSessionManager.saveCurrentSession(sessionName);
+    } catch (error) {
+      console.error(`Failed to save session: ${error}`);
+    }
+  },
+  async restoreSession({ sessionName }) {
+    try {
+      console.log('test2: ' + sessionName);
+      //wait tabSessionManager.restoreSession(sessionName);
+    } catch (error) {
+      console.error(`Failed to restore session: ${error}`);
+    }
+  },
+  // other methods...
+};
 
 browser.runtime.onMessage.addListener((message) => {
-  if (message.type === 'saveSession') {
-    const { sessionName, tabs } = message;
-    return saveSession(sessionName, tabs);
-  } else if (message.type === 'getSession') {
-    return getSession(message.sessionName);
-  } else if (message.type === 'deleteSession') {
-    return deleteSession(message.sessionName);
-  } else if (message.type === 'getSessions') {
-    return getSessions();
+  if (messagingAPI[message.action]) {
+    messagingAPI[message.action](message);
   }
 });
 
-browser.tabs.onCreated.addListener(async (tab) => {
-  const currentSession = await getSession("current");
-  currentSession.tabs.push(tab);
-});
-
-browser.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
-  const currentSession = await getSession("current");
-  updateTabInSession(currentSession.name, tabId, changeInfo);
-});
-
-browser.tabs.onRemoved.addListener(async (tabId, removeInfo) => {
-  const currentSession = await getSession("current");
-  removeTabFromSession(currentSession.name, tabId);
-});
+browser.tabs.onCreated.addListener(() => tabSessionManager.updateActiveSession());
+browser.tabs.onRemoved.addListener(() => tabSessionManager.updateActiveSession());
+browser.tabs.onUpdated.addListener(() => tabSessionManager.updateActiveSession());
