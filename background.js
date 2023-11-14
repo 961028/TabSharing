@@ -1,12 +1,3 @@
-class TabSession {
-  constructor(id, name, tabs) {
-    this.id = id;
-    this.name = name;
-    this.tabs = tabs;
-  }
-}
-
-//const sessions = [];
 let activeSessionId = null;
 
 const tabSessionManager = {
@@ -14,9 +5,8 @@ const tabSessionManager = {
   async saveCurrentSession(name) {
     const tabs = await tabsAPI.getCurrentTabs();
     const id = this.generateId();
-    const session = new TabSession(id, name, tabs);
+    const session = {id, name, tabs};
 
-    //sessions.push(session);
     activeSessionId = id;
     this.storeSessions(session);
   },
@@ -44,7 +34,7 @@ const tabSessionManager = {
     }
 
     session.tabs = await tabsAPI.getCurrentTabs();
-    this.storeSessions();
+    this.storeSessions(session);
   },
 
   findSessionById(id) {
@@ -57,15 +47,27 @@ const tabSessionManager = {
   },
 
   async storeSessions(session) {
-    await storageAPI.addToList('sessions', session);
+    console.log(session);
+    let sessions = await storageAPI.getList('sessions');
+    /*
+    await storageAPI.get('sessions').then((value) => {
+      console.log(value);
+      if (value) {
+        console.log("yes value");
+        sessions = value;
+      } else {
+        console.log("no value");
+        sessions = [];
+      }
+    });
+    */
+    console.log(sessions);
+    sessions.push(session);
+    console.log(sessions);
+    await storageAPI.set('sessions', sessions);
+    sessions = await storageAPI.getList('sessions');
+    console.log(sessions);
   },
-
-  async getSessions() {
-    const sessions = await storageAPI.getList('sessions');
-    if (sessions) {
-      return data.sessions.map(session => new TabSession(session.id, session.name, session.tabs));
-    }
-  }
 }
 
 const tabsAPI = {
@@ -86,30 +88,30 @@ const tabsAPI = {
   }
 }
 
+const storage = browser.storage.sync;
 const storageAPI = {
 
   async get(key) {
-    let result = await browser.storage.sync.get(key);
+    let result = await storage.get(key);
     return result[key];
   },
 
   async set(key, value) {
-    let obj = {};
-    obj[key] = value;
-    await browser.storage.sync.set(obj);
+    await storage.set({ [key]: value });
   },
 
   async remove(key) {
-    await browser.storage.sync.remove(key);
+    await storage.remove(key);
   },
 
   async getList(key) {
-    let result = await browser.storage.sync.get(key);
+    let result = await this.get(key);
     return result || [];
   },
 
   async addToList(key, value) {
-    let list = await this.getList(key);
+    let list = [];
+    list = await this.getList(key);
     list.push(value);
     await this.set(key, list);
   },
@@ -135,8 +137,7 @@ const messagingAPI = {
   },
   async restoreSession({ sessionName }) {
     try {
-      console.log('test2: ' + sessionName);
-      //wait tabSessionManager.restoreSession(sessionName);
+      await tabSessionManager.restoreSession(sessionName);
     } catch (error) {
       console.error(`Failed to restore session: ${error}`);
     }
@@ -153,3 +154,217 @@ browser.runtime.onMessage.addListener((message) => {
 browser.tabs.onCreated.addListener(() => tabSessionManager.updateActiveSession());
 browser.tabs.onRemoved.addListener(() => tabSessionManager.updateActiveSession());
 browser.tabs.onUpdated.addListener(() => tabSessionManager.updateActiveSession());
+
+
+
+
+
+let portFromPopup;
+
+const performAction = {
+  async saveSession({ sessionName }) {
+    await tabSessionManager.saveCurrentSession(sessionName);
+    return { status: 'success' };
+  },
+  
+  noResponseAction({someData}) {
+    // Do something...
+    return null;
+  }
+};
+
+function connected(port) {
+  portFromPopup = port;
+  portFromPopup.onMessage.addListener(async function(m) {
+    if (performAction[m.action]) {
+      try {
+        const response = await performAction[m.action](m);
+        portFromPopup.postMessage({ action: `${m.action}Status`, ...response });
+      } catch (error) {
+        console.error(`Failed to process action ${m.action}: ${error}`);
+        portFromPopup.postMessage({ action: `${m.action}Status`, status: 'error', message: `Failed to process action ${m.action}: ${error}` });
+      }
+    }
+  });
+}
+
+browser.runtime.onConnect.addListener(connected);
+
+
+
+/*
+
+const ACTION_NAMES = {
+  SAVE_SESSION: "saveSession",
+};
+
+class BackgroundController {
+  constructor() {
+    browser.runtime.onConnect.addListener(this.connected.bind(this));
+  }
+
+  connected(port) {
+    this.portFromPopup = port;
+    this.portFromPopup.onMessage.addListener(this.handleRequest.bind(this));
+  }
+
+  async handleRequest(request) {
+    try {
+      let response;
+      switch (request.action) {
+        case ACTION_NAMES.SAVE_SESSION:
+        response = await this.saveSession(request);
+        break;
+        // Other cases...
+      }
+
+      if (response) {
+        this.portFromPopup.postMessage({action: `${request.action}Status`, ...response});
+      }
+    } catch (error) {
+      this.portFromPopup.postMessage({action: `${request.action}Status`, status: 'error', error: error.toString()});
+    }
+  }
+
+  async saveSession(request) {
+    await tabSessionManager.saveCurrentSession(request.sessionName);
+    return { status: 'success' };
+  }
+
+  // Other actions...
+}
+
+new BackgroundController();
+
+*/
+
+
+
+
+
+
+/*
+const ACTION_NAMES = {
+  SAVE_SESSION: "saveSession",
+};
+
+class BackgroundController {
+  constructor() {
+    this.addActionListeners();
+  }
+
+  addActionListeners() {
+    browser.runtime.onConnect.addListener(this.connected.bind(this));
+  }
+
+  connected(port) {
+    this.setPortFromPopup(port);
+    this.addMessageListener();
+  }
+
+  setPortFromPopup(port) {
+    this.portFromPopup = port;
+  }
+
+  addMessageListener() {
+    this.portFromPopup.onMessage.addListener(this.handleRequest.bind(this));
+  }
+
+  async handleRequest(request) {
+    try {
+      let response = await this.processRequest(request);
+      this.sendResponse(request, response);
+    } catch (error) {
+      this.sendError(request, error);
+    }
+  }
+
+  async processRequest(request) {
+    let response;
+    switch (request.action) {
+      case ACTION_NAMES.SAVE_SESSION:
+        response = await this.saveSession(request);
+        break;
+      // Other cases...
+    }
+    return response;
+  }
+
+  sendResponse(request, response){
+    if (response) {
+      this.portFromPopup.postMessage({action: `${request.action}Status`, ...response});
+    }
+  }
+
+  sendError(request, error){
+    this.portFromPopup.postMessage({action: `${request.action}Status`, status: 'error', error: error.toString()});
+  }
+
+  async saveSession(request) {
+    await tabSessionManager.saveCurrentSession(request.sessionName);
+    return { status: 'success' };
+  }
+
+  // Other actions...
+}
+
+new BackgroundController();
+
+*/
+
+
+
+
+const ACTIONS = {
+  SAVE_SESSION: {
+    action_name: "saveSession",
+    action_response: async function(request) {
+        await tabSessionManager.saveCurrentSession(request.sessionName);
+        return { status: 'success' };
+      }
+    }
+};
+
+class BackgroundController {
+  constructor() {
+    this.addActionListeners();
+  }
+
+  addActionListeners() {
+    browser.runtime.onConnect.addListener(this.connected.bind(this));
+  }
+
+  connected(port) {
+    this.setPortFromPopup(port);
+    this.addMessageListener();
+  }
+
+  setPortFromPopup(port) {
+    this.portFromPopup = port;
+  }
+
+  addMessageListener() {
+    this.portFromPopup.onMessage.addListener(this.handleRequest.bind(this));
+  }
+
+  async handleRequest(request) {
+      try {
+        let response = await ACTIONS[request.action].action_response(request);
+        this.sendResponse(request, response);
+      } catch (error) {
+        this.sendError(request, error);
+      }
+  }
+
+  sendResponse(request, response){
+    if (response) {
+      this.portFromPopup.postMessage({action: `${ACTIONS[request.action].action_name}Status`, ...response});
+    }
+  }
+
+  sendError(request, error){
+    this.portFromPopup.postMessage({action: `${ACTIONS[request.action].action_name}Status`, status: 'error', error: error.toString()});
+  }
+}
+
+new BackgroundController();

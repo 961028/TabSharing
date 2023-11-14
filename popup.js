@@ -1,6 +1,9 @@
+const backgroundMessager = new PopupController();
+
 async function init() {
   populateSessionList();
   elements.saveBtn.addEventListener('click', saveCurrentSession);
+  elements.restoreBtn.addEventListener('click', restoreSession);
   elements.clearBtn.addEventListener('click', clearStorage);
 }
 
@@ -11,20 +14,28 @@ const elements = {
   restoreBtn:   document.getElementById('restoreBtn'),
   deleteBtn:    document.getElementById('deleteBtn'),
   clearBtn:     document.getElementById('clearBtn')
-};
+}
 
 async function saveCurrentSession() {
   const sessionName = elements.sessionName.value || 'Unnamed Session';
   elements.sessionName.value = '';
-  await messagingAPI.saveCurrentSession(sessionName);
+  //await messagingAPI.saveCurrentSession(sessionName);
+  backgroundMessager.postMessage();
   populateSessionList();
+}
+
+async function restoreSession() {
+  await messagingAPI.restoreSession("lol");
 }
 
 async function populateSessionList() {
   const sessionList = elements.sessionList;
   sessionList.innerHTML = '';
 
-  const sessions = await storageAPI.getList('sessions');
+  let sessions = [];
+  await storageAPI.get('sessions').then((value) => {
+    if (value) sessions = value;
+  });
   for (const session of sessions) {
     const sessionListItem = document.createElement('div');
     sessionListItem.textContent = session.name;
@@ -33,47 +44,16 @@ async function populateSessionList() {
 }
 
 function clearStorage() {
-  messagingAPI.saveCurrentSession("testA");
-  messagingAPI.restoreSession("testB");
   browser.storage.sync.clear();
-  //populateSessionList();
+  populateSessionList();
 }
 
+const storage = browser.storage.sync;
 const storageAPI = {
-    
+
   async get(key) {
-      let result = await browser.storage.sync.get(key);
-      return result[key];
-  },
-
-  async set(key, value) {
-      let obj = {};
-      obj[key] = value;
-      await browser.storage.sync.set(obj);
-  },
-
-  async remove(key) {
-      await browser.storage.sync.remove(key);
-  },
-
-  async getList(key) {
-      let result = await browser.storage.sync.get(key);
-      return result[key] || [];
-  },
-
-  async addToList(key, value) {
-      let list = await this.getList(key);
-      list.push(value);
-      await this.set(key, list);
-  },
-
-  async removeFromList(key, value) {
-      let list = await this.getList(key);
-      let index = list.indexOf(value);
-      if (index > -1) {
-          list.splice(index, 1);
-          await this.set(key, list);
-      }
+    let result = await storage.get(key);
+    return result[key];
   }
 }
 
@@ -116,3 +96,191 @@ async function deleteSelectedSession() {
   populateSessionList();
 }
 */
+
+
+
+
+
+let portToBackground = browser.runtime.connect({ name: "port-from-popup" });
+
+const performAction = {
+  saveSession(sessionName) {
+    portToBackground.postMessage({ action: 'saveSession', sessionName: sessionName });
+  },
+};
+
+const handleResponse = {
+  saveSessionStatus(message) {
+    if (message.status === 'success') {
+      console.log('Session saved successfully');
+    } else {
+      console.error(message.message);
+    }
+  },
+};
+
+portToBackground.onMessage.addListener((message) => {
+  const handler = handleResponse[message.action];
+  if (handler) {
+    handler(message);
+  } else {
+   console.warn(`No handler for action ${message.action}`);
+  }
+});
+
+
+
+/*
+
+const ACTION_NAMES = {
+  SAVE_SESSION: "saveSession",
+};
+
+class PopupController {
+  constructor() {
+    this.portToBackground = browser.runtime.connect({ name: 'port-from-popup' });
+    this.portToBackground.onMessage.addListener(this.handleResponse.bind(this));
+  }
+
+  postMessage(action, payload) {
+    this.portToBackground.postMessage({ action: action, ...payload });
+  }
+
+  handleResponse(message) {
+    switch (message.action) {
+      case ACTION_NAMES.SAVE_SESSION:
+        this.handleSaveSessionResponse(message);
+        break;
+      default:
+        console.warn(`No handler for action ${message.action}`);
+        break;
+    }
+  }
+
+  handleSaveSessionResponse(message) {
+    if (message.status === 'success') {
+      console.log('Session saved successfully');
+    } else {
+      console.error(message.error);
+    }
+  }
+}
+
+new PopupController();
+
+
+*/
+
+/*
+
+const ACTION_NAMES = {
+  SAVE_SESSION: "saveSession",
+};
+
+class PopupController {
+  constructor() {
+    this.createConnection();
+    this.setMessageListener();
+  }
+
+  createConnection() {
+    this.portToBackground = browser.runtime.connect({ name: 'port-from-popup' });
+  }
+  
+  setMessageListener() {
+    this.portToBackground.onMessage.addListener(this.handleResponse.bind(this));
+  }
+
+  postMessage(action, payload = {}) {
+    this.portToBackground.postMessage({ action, ...payload });
+  }
+
+  handleResponse(message) {
+    if (this.isActionHandlerExists(message.action)) {
+      this.handleAction(message);
+    } else {
+      this.warnNoHandlerForAction(message.action);
+    }
+  }
+
+  isActionHandlerExists(action) {
+    return Object.values(ACTION_NAMES).includes(action);
+  }
+
+  handleAction(message) {
+    switch (message.action) {
+      case ACTION_NAMES.SAVE_SESSION:
+        this.handleSaveSessionResponse(message);
+        break;
+      default:
+        break;
+    }
+  }
+
+  warnNoHandlerForAction(action){
+    console.warn(`No handler for action ${action}`);
+  }
+
+  handleSaveSessionResponse(message) {
+    message.status === 'success' 
+      ? this.logSuccess() 
+      : this.logError(message.error);
+  }
+
+  logSuccess() {
+    console.log('Session saved successfully');
+  }
+
+  logError(error) {
+    console.error(error);
+  }
+}
+
+new PopupController();
+
+*/
+
+
+const ACTIONS = {
+  SAVE_SESSION: {
+    action_name: "saveSession",
+    action_response: function(message) {
+        if (message.status === 'success') {
+          console.log('Session saved successfully');
+        } else {
+          console.error(message.error);
+        }
+      }
+    }
+};
+
+class PopupController {
+  constructor() {
+    this.createConnection();
+    this.setMessageListener();
+  }
+
+  createConnection() {
+    this.portToBackground = browser.runtime.connect({ name: 'port-from-popup' });
+  }
+  
+  setMessageListener() {
+    this.portToBackground.onMessage.addListener(this.handleResponse.bind(this));
+  }
+
+  postMessage(action, payload = {}) {
+    this.portToBackground.postMessage({ action: ACTIONS[action].action_name, ...payload });
+  }
+
+  handleResponse(message) {
+    if (this.isActionHandlerExists(message.action)) {
+      ACTIONS[message.action].action_response(message);
+    } else {
+      console.warn(`No response handler for action ${message.action}`);
+    }
+  }
+
+  isActionHandlerExists(action) {
+    return !!ACTIONS[action];
+  }
+}
