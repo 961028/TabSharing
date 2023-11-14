@@ -47,26 +47,9 @@ const tabSessionManager = {
   },
 
   async storeSessions(session) {
-    console.log(session);
     let sessions = await storageAPI.getList('sessions');
-    /*
-    await storageAPI.get('sessions').then((value) => {
-      console.log(value);
-      if (value) {
-        console.log("yes value");
-        sessions = value;
-      } else {
-        console.log("no value");
-        sessions = [];
-      }
-    });
-    */
-    console.log(sessions);
     sessions.push(session);
-    console.log(sessions);
     await storageAPI.set('sessions', sessions);
-    sessions = await storageAPI.getList('sessions');
-    console.log(sessions);
   },
 }
 
@@ -126,30 +109,43 @@ const storageAPI = {
   }
 }
 
-const messagingAPI = {
-  async saveSession({ sessionName }) {
-    try {
-      //console.log('test1: ' + sessionName);
-      await tabSessionManager.saveCurrentSession(sessionName);
-    } catch (error) {
-      console.error(`Failed to save session: ${error}`);
-    }
+
+
+let port;
+browser.runtime.onConnect.addListener(connected);
+function connected(p) {
+  port = p;
+  port.onMessage.addListener(onMessage);
+}
+
+const ACTIONS = {
+  async saveSession(sessionName) {
+    await tabSessionManager.saveCurrentSession(sessionName);
+    CALLBACKS.saveSession(sessionName);
   },
-  async restoreSession({ sessionName }) {
-    try {
-      await tabSessionManager.restoreSession(sessionName);
-    } catch (error) {
-      console.error(`Failed to restore session: ${error}`);
-    }
-  },
-  // other methods...
 };
 
-browser.runtime.onMessage.addListener((message) => {
-  if (messagingAPI[message.action]) {
-    messagingAPI[message.action](message);
+function onMessage(message) {
+  try {
+    ACTIONS[message.action](message.content);
+  } catch(error) {
+    console.error(`Failed to execute action: ${error}`);
   }
-});
+}
+
+const CALLBACKS = {
+  saveSession(sessionName) {
+    sendCallback('saveSession', sessionName);
+  },
+};
+
+function sendCallback(action, content) {
+  try {
+    port.postMessage({ action: action, content: content });
+  } catch (error) {
+    console.error(`Failed to send message: ${error}`);
+  }
+}
 
 browser.tabs.onCreated.addListener(() => tabSessionManager.updateActiveSession());
 browser.tabs.onRemoved.addListener(() => tabSessionManager.updateActiveSession());
@@ -157,7 +153,7 @@ browser.tabs.onUpdated.addListener(() => tabSessionManager.updateActiveSession()
 
 
 
-
+/*
 
 let portFromPopup;
 
@@ -192,7 +188,7 @@ browser.runtime.onConnect.addListener(connected);
 
 
 
-/*
+
 
 const ACTION_NAMES = {
   SAVE_SESSION: "saveSession",
@@ -236,14 +232,10 @@ class BackgroundController {
 
 new BackgroundController();
 
-*/
 
 
 
 
-
-
-/*
 const ACTION_NAMES = {
   SAVE_SESSION: "saveSession",
 };
@@ -310,14 +302,14 @@ class BackgroundController {
 
 new BackgroundController();
 
-*/
+
 
 
 
 
 const ACTIONS = {
   SAVE_SESSION: {
-    action_name: "saveSession",
+    action_name: 'saveSession',
     action_response: async function(request) {
         await tabSessionManager.saveCurrentSession(request.sessionName);
         return { status: 'success' };
@@ -326,25 +318,14 @@ const ACTIONS = {
 };
 
 class BackgroundController {
-  constructor() {
-    this.addActionListeners();
-  }
 
-  addActionListeners() {
+  constructor() {
     browser.runtime.onConnect.addListener(this.connected.bind(this));
   }
 
   connected(port) {
-    this.setPortFromPopup(port);
-    this.addMessageListener();
-  }
-
-  setPortFromPopup(port) {
-    this.portFromPopup = port;
-  }
-
-  addMessageListener() {
-    this.portFromPopup.onMessage.addListener(this.handleRequest.bind(this));
+    this.port = port;
+    this.port.onMessage.addListener(this.handleRequest.bind(this));
   }
 
   async handleRequest(request) {
@@ -358,13 +339,15 @@ class BackgroundController {
 
   sendResponse(request, response){
     if (response) {
-      this.portFromPopup.postMessage({action: `${ACTIONS[request.action].action_name}Status`, ...response});
+      this.port.postMessage({action: `${ACTIONS[request.action].action_name}Status`, ...response});
     }
   }
 
   sendError(request, error){
-    this.portFromPopup.postMessage({action: `${ACTIONS[request.action].action_name}Status`, status: 'error', error: error.toString()});
+    this.port.postMessage({action: `${ACTIONS[request.action].action_name}Status`, status: 'error', error: error.toString()});
   }
 }
 
 new BackgroundController();
+
+*/

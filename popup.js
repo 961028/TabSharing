@@ -1,4 +1,4 @@
-const backgroundMessager = new PopupController();
+//const backgroundMessager = new PopupController();
 
 async function init() {
   populateSessionList();
@@ -16,16 +16,15 @@ const elements = {
   clearBtn:     document.getElementById('clearBtn')
 }
 
-async function saveCurrentSession() {
+function saveCurrentSession() {
   const sessionName = elements.sessionName.value || 'Unnamed Session';
   elements.sessionName.value = '';
-  //await messagingAPI.saveCurrentSession(sessionName);
-  backgroundMessager.postMessage();
+  MESSAGES.saveSession(sessionName);
   populateSessionList();
 }
 
 async function restoreSession() {
-  await messagingAPI.restoreSession("lol");
+  populateSessionList();
 }
 
 async function populateSessionList() {
@@ -50,30 +49,46 @@ function clearStorage() {
 
 const storage = browser.storage.sync;
 const storageAPI = {
-
   async get(key) {
     let result = await storage.get(key);
     return result[key];
   }
 }
 
-const messagingAPI = {
-  async saveCurrentSession(sessionName) {
-    try {
-      await browser.runtime.sendMessage({ action: 'saveSession', sessionName });
-    } catch (error) {
-      console.error(`Failed to send message: ${error}`);
-    }
+
+
+const port = browser.runtime.connect({ name: "popup-port" });
+port.onMessage.addListener(onMessage);
+
+const ACTIONS = {
+  saveSession(sessionName) {
+    console.log('success!');
+    console.log(sessionName);
+    populateSessionList();
   },
-  async restoreSession(sessionName) {
-      try {
-        await browser.runtime.sendMessage({ action: 'restoreSession', sessionName });
-      } catch (error) {
-        console.error(`Failed to send message: ${error}`);
-    }
+}
+
+function onMessage(message) {
+  try {
+    ACTIONS[message.action](message.content);
+  } catch(error) {
+    console.error(`Failed to execute action: ${error}`);
+  }
+}
+
+const MESSAGES = {
+  saveSession(sessionName) {
+    sendMessage('saveSession', sessionName);
   },
-  // other methods...
 };
+
+function sendMessage(action, content) {
+  try {
+    port.postMessage({ action: action, content: content });
+  } catch (error) {
+    console.error(`Failed to send message: ${error}`);
+  }
+}
 
 document.addEventListener('DOMContentLoaded', init);
 
@@ -95,7 +110,7 @@ async function deleteSelectedSession() {
   await browser.runtime.sendMessage({ type: 'deleteSession', sessionName });
   populateSessionList();
 }
-*/
+
 
 
 
@@ -130,7 +145,7 @@ portToBackground.onMessage.addListener((message) => {
 
 
 
-/*
+
 
 const ACTION_NAMES = {
   SAVE_SESSION: "saveSession",
@@ -169,9 +184,9 @@ class PopupController {
 new PopupController();
 
 
-*/
 
-/*
+
+
 
 const ACTION_NAMES = {
   SAVE_SESSION: "saveSession",
@@ -238,7 +253,7 @@ class PopupController {
 
 new PopupController();
 
-*/
+
 
 
 const ACTIONS = {
@@ -284,3 +299,5 @@ class PopupController {
     return !!ACTIONS[action];
   }
 }
+
+*/
