@@ -28,14 +28,18 @@ async function populateSessionList() {
   const sessionList = elements.sessionList;
   sessionList.innerHTML = '';
 
-  let sessions = await storageAPI.getList('sessions');
+  const sessions = await storageAPI.getList('sessions');
   for (const session of sessions) {
     sessionList.appendChild(new SessionListItem(session));
   };
 }
 
-function clearStorage() {
+async function clearStorage() {
   browser.storage.sync.clear();
+  const windows = await browser.windows.getAll();
+  for (const window of windows) {
+    browser.sessions.removeWindowValue(window.id, 'sessionId');
+  };
   populateSessionList();
 }
 

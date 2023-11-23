@@ -19,7 +19,8 @@
     "permissions": [
         "sessions",
         "storage",
-        "tabs"
+        "tabs",
+        "webNavigation"
       ],
 
       "action": {

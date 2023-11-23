@@ -1,47 +1,48 @@
-let activeSessionId = null;
-
 const tabSessionManager = {
 
   async saveCurrentSession(name) {
-    const tabs = await tabsAPI.getCurrentTabs();
-    const id = this.generateId();
-    const session = {id, name, tabs};
+    const currentWindow = await browser.windows.getLastFocused();
+    const currentSessionId = await browser.sessions.getWindowValue(currentWindow.id, 'sessionId');
+    if(currentSessionId) return;
+
+    const newSessionId = this.generateId();
+    const tabs = await tabsAPI.getTabs(currentWindow.id); // could optimize with currentwindow
+    const session = {id: newSessionId, name: name, tabs: tabs};
   
     let sessions = await storageAPI.getList('sessions');
     sessions.push(session);
     await storageAPI.set('sessions', sessions);
-    activeSessionId = id;
+    browser.sessions.setWindowValue(currentWindow.id, 'sessionId', newSessionId);
   },
 
   async restoreSession(id) {
-    if(activeSessionId === id) {
-      return;
-    } 
+    const currentWindow = await browser.windows.getLastFocused();
+    const currentSessionId = await browser.sessions.getWindowValue(currentWindow.id, 'sessionId');
+    if(currentSessionId === id) return;
+
     const session = await this.findSessionById(id);
-    if (!session) {
-      return;
-    }
+    if (!session) return;
 
-    const currentTabs = await tabsAPI.getCurrentTabs();
+    const currentTabs = await tabsAPI.getTabs(currentWindow.id);
 
-    removeListeners();
+    await removeListeners();
     await tabsAPI.openTabs(session.tabs);
     await tabsAPI.closeTabs(currentTabs);
-    addListeners();
+    await addListeners();
 
-    activeSessionId = id;
+    browser.sessions.setWindowValue(currentWindow.id, 'sessionId', id);
   },
 
-  async updateActiveSession() {
-    if (!activeSessionId) {
+  async updateSession(windowId) {
+    const sessionId = await browser.sessions.getWindowValue(windowId, 'sessionId');
+    if (!sessionId) {
+      console.log(`session id for window ${windowId} is ${sessionId}`);
       return;
     }
 
     const sessions = await storageAPI.getList('sessions');
-    const session = await sessions.find(session => session.id === activeSessionId);
-    console.log(sessions);
-    session.tabs = await tabsAPI.getCurrentTabs();
-    console.log(sessions);
+    const session = await sessions.find(session => session.id === sessionId);
+    session.tabs = await tabsAPI.getTabs(windowId);
     await storageAPI.set('sessions', sessions);
   },
 
@@ -57,8 +58,8 @@ const tabSessionManager = {
 
 const tabsAPI = {
 
-  async getCurrentTabs() {
-    const tabs = await browser.tabs.query({currentWindow: true});
+  async getTabs(windowId) {
+    const tabs = await browser.tabs.query({windowId: windowId});
     return tabs.map(({url, title, id}) => ({url, title, id}));
   },
 
@@ -152,16 +153,66 @@ function sendCallback(action, content) {
 }
 
 
-function addListeners() {
-  browser.tabs.onCreated.addListener(() => tabSessionManager.updateActiveSession());
-  browser.tabs.onRemoved.addListener(() => tabSessionManager.updateActiveSession());
-  browser.tabs.onUpdated.addListener(() => tabSessionManager.updateActiveSession());
+async function onRemoved(tabId, removeInfo) {
+  let {listenersActive} = await browser.storage.local.get('listenersActive');
+  if(listenersActive) {
+    if(removeInfo.isWindowClosing) {
+      console.log('window closed: !onRemoved')
+    } else {
+      console.log('onRemoved');
+      tabSessionManager.updateSession(removeInfo.windowId);
+    }
+  } else {
+    console.log('listeners inactive: !onRemoved');
+  }
 }
 
-function removeListeners() {
-  browser.tabs.onCreated.removeListener(() => tabSessionManager.updateActiveSession());
-  browser.tabs.onRemoved.removeListener(() => tabSessionManager.updateActiveSession());
-  browser.tabs.onUpdated.removeListener(() => tabSessionManager.updateActiveSession());
+async function onUrlUpdated(tabId, changeInfo, tab) {
+  let {listenersActive} = await browser.storage.local.get('listenersActive');
+  if(listenersActive) {
+    console.log('onUrlUpdated');
+    console.log(`Tab ${tabId} in window ${tab.windowId}: ${tab.url}`);
+    tabSessionManager.updateSession(tab.windowId);
+  } else {
+    console.log('listeners inactive: !onUrlUpdated');
+  }
 }
 
-addListeners();
+/*
+async function onUrlUpdated(details) {
+  let {listenersActive} = await browser.storage.local.get('listenersActive');
+  if(listenersActive) {
+    if(details.transitionType === "auto_subframe") {
+      console.log("auto_subframe");
+      return;
+    } else {
+      console.log('onUrlUpdated');
+      console.log(`Tab: ${details.tabId}, ${details.transitionType}, ${details.url}`);
+      tabSessionManager.updateSession();
+    }
+  } else {
+    console.log('listeners inactive: !onUrlUpdated');
+  }
+}
+*/
+
+async function onMoved() {
+  console.log('onMoved');
+  //tabSessionManager.updateSession();
+}
+
+async function addListeners() {
+  console.log('activating listeners');
+  await browser.storage.local.set({'listenersActive': true});
+}
+
+async function removeListeners() {
+  console.log('deactivating listeners');
+  await browser.storage.local.set({'listenersActive': false});
+}
+
+//browser.webNavigation.onCommitted.addListener(onUrlUpdated);
+browser.tabs.onUpdated.addListener(onUrlUpdated, {properties: ["url"]});
+browser.tabs.onMoved.addListener(onMoved);
+browser.tabs.onRemoved.addListener(onRemoved);
+document.addEventListener('DOMContentLoaded', addListeners);
