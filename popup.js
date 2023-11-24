@@ -27,10 +27,12 @@ async function restoreSession(id) {
 async function populateSessionList() {
   const sessionList = elements.sessionList;
   sessionList.innerHTML = '';
-
-  const sessions = await storageAPI.getList('sessions');
-  for (const session of sessions) {
-    sessionList.appendChild(new SessionListItem(session));
+  const storageItems = await storage.get();
+  for (const item in storageItems) {
+    if (item.startsWith('session-')) {
+      const session = storageItems[item];
+      sessionList.appendChild(new SessionListItem(session));
+    }
   };
 }
 
@@ -56,10 +58,17 @@ class SessionListItem {
 }
 
 // Utils
-
-const storage = browser.storage.local;
 const storageAPI = {
 
+  async getSession(sessionId) {
+    let result = await storage.get(`session-${sessionId}`);
+    return result[`session-${sessionId}`];
+  },
+
+  async setSession(sessionId, session) {
+    await storage.set({ [`session-${sessionId}`]: session });
+  },
+  /*
   async get(key) {
     let result = await storage.get(key);
     return result[key];
@@ -93,6 +102,7 @@ const storageAPI = {
       await this.set(key, list);
     }
   }
+  */
 }
 
 

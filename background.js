@@ -5,23 +5,21 @@ const tabSessionManager = {
     const currentSessionId = await browser.sessions.getWindowValue(currentWindow.id, 'sessionId');
     if(currentSessionId) return;
 
-    const newSessionId = this.generateId();
+    const newSessionId = Date.now().toString(36);
     const tabs = await tabsAPI.getTabs(currentWindow.id);
-    const session = {id: newSessionId, name: name, tabs: tabs};
+    const session = { id: newSessionId, name: name, tabs: tabs };
   
-    let sessions = await storageAPI.getList('sessions');
-    sessions.push(session);
-    await storageAPI.set('sessions', sessions);
-    browser.sessions.setWindowValue(currentWindow.id, 'sessionId', newSessionId);
+    await storageAPI.setSession(newSessionId, session);
+    browser.sessions.setWindowValue(currentWindow.id, 'sessionId', newSessionId);  
   },
 
-  async restoreSession(id) {
+  async restoreSession(sessionId) {
     const currentWindow = await browser.windows.getLastFocused();
     const currentSessionId = await browser.sessions.getWindowValue(currentWindow.id, 'sessionId');
 
-    if(currentSessionId === id) return;
+    if(currentSessionId === sessionId) return;
 
-    const session = await this.findSessionById(id);
+    const session = await storageAPI.getSession(sessionId);
     if (!session) return;
     
     const currentTabs = await tabsAPI.getTabs(currentWindow.id);
@@ -31,49 +29,43 @@ const tabSessionManager = {
     await tabsAPI.closeTabs(currentTabs);
     await addListeners();
 
-    browser.sessions.setWindowValue(currentWindow.id, 'sessionId', id);
+    browser.sessions.setWindowValue(currentWindow.id, 'sessionId', sessionId);
   },
 
-  async restoreSessionAsNewWindow(id) {
-    const session = await this.findSessionById(id);
+  async restoreSessionAsNewWindow(sessionId) {
+    const session = await storageAPI.getSession(sessionId);
     if (!session) return;
 
     await removeListeners();
     const newWindow = await tabsAPI.openTabsInNewWindow(session.tabs);
-    await browser.sessions.setWindowValue(newWindow.id, 'sessionId', id);
+    await browser.sessions.setWindowValue(newWindow.id, 'sessionId', sessionId);
     await addListeners();
   },
 
   async updateSession(windowId) {
     const sessionId = await browser.sessions.getWindowValue(windowId, 'sessionId');
     if (!sessionId) {
-      console.log(`session id for window ${windowId} is undefined`);
+      console.log(`Window ${windowId} is not a saved session`);
+      return;
+    }
+
+    const session = await storageAPI.getSession(sessionId);
+    if(!session){
+      console.log(`No session found with id: ${sessionId}`);
       return;
     }
     
-    const sessions = await storageAPI.getList('sessions');
-    const session = await sessions.find(session => session.id === sessionId);
     session.tabs = await tabsAPI.getTabs(windowId);
-    await storageAPI.set('sessions', sessions);
-    console.log(`set tabs in ${session.name} too: ${session.tabs.map(({ url }) => url )}`)
-  },
-
-  async findSessionById(id) {
-    const sessions = await storageAPI.getList('sessions');
-    return sessions.find(session => session.id === id);
-  },
-
-  generateId() {
-    return Date.now().toString(36);
-  },
+    await storageAPI.setSession(sessionId, session);
+    console.log(`Set tabs in ${session.name} too: ${session.tabs.map(({ url }) => url )}`)
+  }
 }
 
 const tabsAPI = {
 
   async getTabs(windowId) {
     const tabs = await browser.tabs.query({ windowId: windowId });
-    console.log(tabs)
-    return tabs.map(({ url, title, id }) => ({ url, title, id }));
+    return tabs.map(({ url, title }) => ({ url, title }));
   },
 
   async closeTabs(tabs) {
@@ -90,9 +82,19 @@ const tabsAPI = {
   }
 }
 
+// Utils
 const storage = browser.storage.local;
 const storageAPI = {
 
+  async getSession(sessionId) {
+    let result = await storage.get(`session-${sessionId}`);
+    return result[`session-${sessionId}`];
+  },
+
+  async setSession(sessionId, session) {
+    await storage.set({ [`session-${sessionId}`]: session });
+  },
+  /*
   async get(key) {
     let result = await storage.get(key);
     return result[key];
@@ -126,9 +128,8 @@ const storageAPI = {
       await this.set(key, list);
     }
   }
+  */
 }
-
-
 
 let port;
 browser.runtime.onConnect.addListener(connected);
@@ -200,7 +201,7 @@ async function onRemoved(tabId, removeInfo) {
       console.log('window closed: !onRemoved');
     } else {
       console.log('onRemoved');
-      setTimeout(() => {tabSessionManager.updateSession(removeInfo.windowId);}, 100);
+      setTimeout(() => {tabSessionManager.updateSession(removeInfo.windowId);}, 110);
     }
   } else {
     console.log('listeners inactive: !onRemoved');
@@ -238,3 +239,16 @@ browser.tabs.onMoved.addListener(onMoved);
 browser.tabs.onAttached.addListener(onAttached);
 browser.tabs.onDetached.addListener(onDetached);
 document.addEventListener('DOMContentLoaded', addListeners);
+
+
+function logStorageChange(changes, area) {
+  const changedItems = Object.keys(changes);
+
+  for (const item of changedItems) {
+    console.log(`${item} has changed:`);
+    console.log("Old value: ", changes[item].oldValue);
+    console.log("New value: ", changes[item].newValue);
+  }
+}
+
+//browser.storage.onChanged.addListener(logStorageChange);
