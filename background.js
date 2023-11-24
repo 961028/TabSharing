@@ -6,7 +6,7 @@ const tabSessionManager = {
     if(currentSessionId) return;
 
     const newSessionId = this.generateId();
-    const tabs = await tabsAPI.getTabs(currentWindow.id); // could optimize with currentwindow
+    const tabs = await tabsAPI.getTabs(currentWindow.id);
     const session = {id: newSessionId, name: name, tabs: tabs};
   
     let sessions = await storageAPI.getList('sessions');
@@ -18,11 +18,12 @@ const tabSessionManager = {
   async restoreSession(id) {
     const currentWindow = await browser.windows.getLastFocused();
     const currentSessionId = await browser.sessions.getWindowValue(currentWindow.id, 'sessionId');
+
     if(currentSessionId === id) return;
 
     const session = await this.findSessionById(id);
     if (!session) return;
-
+    
     const currentTabs = await tabsAPI.getTabs(currentWindow.id);
 
     await removeListeners();
@@ -33,17 +34,28 @@ const tabSessionManager = {
     browser.sessions.setWindowValue(currentWindow.id, 'sessionId', id);
   },
 
+  async restoreSessionAsNewWindow(id) {
+    const session = await this.findSessionById(id);
+    if (!session) return;
+
+    await removeListeners();
+    const newWindow = await tabsAPI.openTabsInNewWindow(session.tabs);
+    await browser.sessions.setWindowValue(newWindow.id, 'sessionId', id);
+    await addListeners();
+  },
+
   async updateSession(windowId) {
     const sessionId = await browser.sessions.getWindowValue(windowId, 'sessionId');
     if (!sessionId) {
-      console.log(`session id for window ${windowId} is ${sessionId}`);
+      console.log(`session id for window ${windowId} is undefined`);
       return;
     }
-
+    
     const sessions = await storageAPI.getList('sessions');
     const session = await sessions.find(session => session.id === sessionId);
     session.tabs = await tabsAPI.getTabs(windowId);
     await storageAPI.set('sessions', sessions);
+    console.log(`set tabs in ${session.name} too: ${session.tabs.map(({ url }) => url )}`)
   },
 
   async findSessionById(id) {
@@ -59,21 +71,26 @@ const tabSessionManager = {
 const tabsAPI = {
 
   async getTabs(windowId) {
-    const tabs = await browser.tabs.query({windowId: windowId});
-    return tabs.map(({url, title, id}) => ({url, title, id}));
+    const tabs = await browser.tabs.query({ windowId: windowId });
+    console.log(tabs)
+    return tabs.map(({ url, title, id }) => ({ url, title, id }));
   },
 
   async closeTabs(tabs) {
-    const tabIds = tabs.map(({id}) => id);
+    const tabIds = tabs.map(({ id }) => id);
     await browser.tabs.remove(tabIds);
   },
 
-  async openTabs(tabs) {
-    tabs.map(({url}) => browser.tabs.create({url}));
+  async openTabs(tabs, windowId) {
+    await tabs.map(({ url }) => browser.tabs.create({ url: url, windowId: windowId }));
+  },
+
+  async openTabsInNewWindow(tabs) {
+    return await browser.windows.create({ url: tabs.map(({ url }) => url) });
   }
 }
 
-const storage = browser.storage.sync;
+const storage = browser.storage.local;
 const storageAPI = {
 
   async get(key) {
@@ -126,7 +143,7 @@ const ACTIONS = {
     CALLBACKS.saveSession(sessionName);
   },
   restoreSession(id) {
-    tabSessionManager.restoreSession(id);
+    tabSessionManager.restoreSessionAsNewWindow(id);
   },
 };
 
@@ -153,25 +170,37 @@ function sendCallback(action, content) {
 }
 
 
-async function onUrlUpdated(tabId, changeInfo, tabInfo) {
+async function onUrlUpdated(details) {
   let {listenersActive} = await browser.storage.local.get('listenersActive');
-  if(listenersActive) {
-    console.log('onUrlUpdated');
-    console.log(`Tab ${tabId} in window ${tabInfo.windowId}: ${tabInfo.url}`);
-    tabSessionManager.updateSession(tabInfo.windowId);
-  } else {
-    console.log('listeners inactive: !onUrlUpdated');
+  if(!listenersActive) {
+    console.log('!onUrlUpdated: listeners inactive');
+    return;
   }
+  if(details.transitionType === 'auto_subframe') {
+    //console.log('!onUrlUpdated: auto_subframe');
+    return;
+  }
+  if(details.transitionType === 'reload') {
+    //console.log('!onUrlUpdated: reload');
+    //return;
+  }
+  if(details.frameId !== 0) {
+    //console.log('!onUrlUpdated: details.frameId !== 0');
+    return;
+  }
+  const tabInfo = await browser.tabs.get(details.tabId);
+  console.log(`onUrlUpdated: Tab ${details.tabId} in window ${tabInfo.windowId}: ${tabInfo.url}`);
+  tabSessionManager.updateSession(tabInfo.windowId);
 }
 
 async function onRemoved(tabId, removeInfo) {
   let {listenersActive} = await browser.storage.local.get('listenersActive');
   if(listenersActive) {
     if(removeInfo.isWindowClosing) {
-      console.log('window closed: !onRemoved')
+      console.log('window closed: !onRemoved');
     } else {
       console.log('onRemoved');
-      tabSessionManager.updateSession(removeInfo.windowId);
+      setTimeout(() => {tabSessionManager.updateSession(removeInfo.windowId);}, 100);
     }
   } else {
     console.log('listeners inactive: !onRemoved');
@@ -194,16 +223,16 @@ async function onDetached(tabId, detachInfo) {
 }
 
 async function addListeners() {
-  console.log('activating listeners');
+  //console.log('activating listeners');
   await browser.storage.local.set({'listenersActive': true});
 }
 
 async function removeListeners() {
-  console.log('deactivating listeners');
+  //console.log('deactivating listeners');
   await browser.storage.local.set({'listenersActive': false});
 }
 
-browser.tabs.onUpdated.addListener(onUrlUpdated, {properties: ["url"]});
+browser.webNavigation.onCommitted.addListener(onUrlUpdated);
 browser.tabs.onRemoved.addListener(onRemoved);
 browser.tabs.onMoved.addListener(onMoved);
 browser.tabs.onAttached.addListener(onAttached);

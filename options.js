@@ -34,16 +34,6 @@ async function populateSessionList() {
   };
 }
 
-async function clearStorage() {
-  browser.storage.sync.clear();
-  browser.storage.local.clear();
-  const windows = await browser.windows.getAll();
-  for (const window of windows) {
-    browser.sessions.removeWindowValue(window.id, 'sessionId');
-  };
-  populateSessionList();
-}
-
 // Components
 
 class SessionListItem {
@@ -96,8 +86,7 @@ const storageAPI = {
 }
 
 
-
-const port = browser.runtime.connect({ name: "popup-port" });
+const port = browser.runtime.connect({ name: "options-port" });
 port.onMessage.addListener(onMessage);
 
 const ACTIONS = {
