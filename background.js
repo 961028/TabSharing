@@ -153,6 +153,17 @@ function sendCallback(action, content) {
 }
 
 
+async function onUrlUpdated(tabId, changeInfo, tabInfo) {
+  let {listenersActive} = await browser.storage.local.get('listenersActive');
+  if(listenersActive) {
+    console.log('onUrlUpdated');
+    console.log(`Tab ${tabId} in window ${tabInfo.windowId}: ${tabInfo.url}`);
+    tabSessionManager.updateSession(tabInfo.windowId);
+  } else {
+    console.log('listeners inactive: !onUrlUpdated');
+  }
+}
+
 async function onRemoved(tabId, removeInfo) {
   let {listenersActive} = await browser.storage.local.get('listenersActive');
   if(listenersActive) {
@@ -167,38 +178,19 @@ async function onRemoved(tabId, removeInfo) {
   }
 }
 
-async function onUrlUpdated(tabId, changeInfo, tab) {
-  let {listenersActive} = await browser.storage.local.get('listenersActive');
-  if(listenersActive) {
-    console.log('onUrlUpdated');
-    console.log(`Tab ${tabId} in window ${tab.windowId}: ${tab.url}`);
-    tabSessionManager.updateSession(tab.windowId);
-  } else {
-    console.log('listeners inactive: !onUrlUpdated');
-  }
-}
-
-/*
-async function onUrlUpdated(details) {
-  let {listenersActive} = await browser.storage.local.get('listenersActive');
-  if(listenersActive) {
-    if(details.transitionType === "auto_subframe") {
-      console.log("auto_subframe");
-      return;
-    } else {
-      console.log('onUrlUpdated');
-      console.log(`Tab: ${details.tabId}, ${details.transitionType}, ${details.url}`);
-      tabSessionManager.updateSession();
-    }
-  } else {
-    console.log('listeners inactive: !onUrlUpdated');
-  }
-}
-*/
-
-async function onMoved() {
+async function onMoved(tabId, moveInfo) {
   console.log('onMoved');
-  //tabSessionManager.updateSession();
+  tabSessionManager.updateSession(moveInfo.windowId);
+}
+
+async function onAttached(tabId, attachInfo) {
+  console.log('onAttached');
+  tabSessionManager.updateSession(attachInfo.newWindowId);
+}
+
+async function onDetached(tabId, detachInfo) {
+  console.log('onDetached');
+  tabSessionManager.updateSession(detachInfo.oldWindowId);
 }
 
 async function addListeners() {
@@ -211,8 +203,9 @@ async function removeListeners() {
   await browser.storage.local.set({'listenersActive': false});
 }
 
-//browser.webNavigation.onCommitted.addListener(onUrlUpdated);
 browser.tabs.onUpdated.addListener(onUrlUpdated, {properties: ["url"]});
-browser.tabs.onMoved.addListener(onMoved);
 browser.tabs.onRemoved.addListener(onRemoved);
+browser.tabs.onMoved.addListener(onMoved);
+browser.tabs.onAttached.addListener(onAttached);
+browser.tabs.onDetached.addListener(onDetached);
 document.addEventListener('DOMContentLoaded', addListeners);
