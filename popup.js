@@ -58,6 +58,7 @@ class SessionListItem {
 }
 
 // Utils
+const storage = browser.storage.local;
 const storageAPI = {
 
   async getSession(sessionId) {

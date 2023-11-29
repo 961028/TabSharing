@@ -3,7 +3,7 @@ const tabSessionManager = {
   async saveCurrentSession(name) {
     const currentWindow = await browser.windows.getLastFocused();
     const currentSessionId = await browser.sessions.getWindowValue(currentWindow.id, 'sessionId');
-    if(currentSessionId) return;
+    if (currentSessionId) return;
 
     const newSessionId = Date.now().toString(36);
     const tabs = await tabsAPI.getTabs(currentWindow.id);
