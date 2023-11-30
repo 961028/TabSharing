@@ -1,4 +1,4 @@
-function init() {
+function test() {
   populateSessionList();
   elements.saveBtn.addEventListener('click', saveCurrentSession);
   elements.restoreBtn.addEventListener('click', restoreSession);
@@ -27,7 +27,7 @@ async function restoreSession(id) {
 async function populateSessionList() {
   const sessionList = elements.sessionList;
   sessionList.innerHTML = '';
-  const storageItems = await storage.get();
+  const storageItems = await syncStorage.get();
   for (const item in storageItems) {
     if (item.startsWith('session-')) {
       const session = storageItems[item];
@@ -58,16 +58,17 @@ class SessionListItem {
 }
 
 // Utils
-const storage = browser.storage.local;
+const syncStorage = browser.storage.local;
+const localStorage = browser.storage.local;
 const storageAPI = {
 
   async getSession(sessionId) {
-    let result = await storage.get(`session-${sessionId}`);
+    let result = await syncStorage.get(`session-${sessionId}`);
     return result[`session-${sessionId}`];
   },
 
   async setSession(sessionId, session) {
-    await storage.set({ [`session-${sessionId}`]: session });
+    await syncStorage.set({ [`session-${sessionId}`]: session });
   },
   /*
   async get(key) {
@@ -107,7 +108,7 @@ const storageAPI = {
 }
 
 
-
+// Message passing
 const port = browser.runtime.connect({ name: "popup-port" });
 port.onMessage.addListener(onMessage);
 
@@ -142,4 +143,4 @@ function sendMessage(action, content) {
   }
 }
 
-document.addEventListener('DOMContentLoaded', init);
+document.addEventListener('DOMContentLoaded', test);
