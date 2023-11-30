@@ -1,75 +1,87 @@
 class Server {
   constructor() {
-    this.observers = [];
+    this.data = new Map();
   }
 
-  subscribe(fn) {
-    this.observers.push(fn);
+  getItem(key) {
+    return this.data.get(key);
   }
 
-  unsubscribe(fn) {
-    this.observers = this.observers.filter(observer => observer !== fn);
-  }
-
-  notify(data) {
-    this.observers.forEach(observer => observer(data));
+  setItem(key, value) {
+    this.data.set(key, value);
   }
 }
-
 
 class System {
   constructor(server) {
     this.server = server;
-    this.data = {};
-
-    this.server.subscribe(this.handleUpdate.bind(this));
-  }
-
-  handleUpdate(changeObject) {
-    const { action, key, value } = changeObject;
-
-    if (action === 'add' || action === 'update') {
-      this.data[key] = value;
-    }
-
-    if (action === 'delete') {
-      delete this.data[key];
-    }
+    this.data = new Map();
   }
 
   setItem(key, value) {
-    this.server.notify({
-      action: 'add',
-      key: key,
-      value: value,
-    });
+    this.data.set(key, value);
   }
 
   getItem(key) {
-    return this.data[key];
+    if (this.data.has(key)) return this.data.get(key);
+    return null;
   }
+  
+  syncNow() {
+    // Sync from server to browser
+    for (let [key, value] of this.server.data.entries()) {
+      if (this.data.get(key) !== value || !this.data.has(key)) {
+        this.data.set(key, value);
+      }
+    }
 
-  removeItem(key) {
-    this.server.notify({
-      action: 'delete',
-      key: key,
-    });
+    // Sync from browser to server
+    for (let [key, value] of this.data.entries()) {
+      if (this.server.data.get(key) !== value || !this.server.data.has(key)) {
+        this.server.setItem(key, value);
+      }
+    }
   }
 }
 
-function test() {
+function testAdd() {
+  const { client1, client2 } = mockup();
+  client1.setItem('key-1', 1);
+  client1.syncNow();
+  client2.syncNow();
+  console.assert(client2.getItem('key-1') === 1,'Test failed: testAdd');
+}
+
+function testAddNoSyncOnSend() {
+  const { client1, client2 } = mockup();
+  client1.setItem('key-1', 1);
+  client2.syncNow();
+  console.assert(client2.getItem('key-1') === null,'Test failed: testAddNoSyncOnSend');
+}
+
+function testAddNoSyncOnReceive() {
+  const { client1, client2 } = mockup();
+  client1.setItem('key-1', 1);
+  client1.syncNow();
+  console.assert(client2.getItem('key-1') === null,'Test failed: testAddNoSyncOnReceive');
+}
+
+function runTests() {
+  testAdd();
+  testAddNoSyncOnSend();
+  testAddNoSyncOnReceive();
+
+  console.log('Tests performed.');
+}
+
+function mockup() {
   const server = new Server();
-  const browser1 = new System(server);
-  const browser2 = new System(server);
-
-  browser1.setItem('key-1', 1);
-  console.log(browser2.getItem('key-1')); // returns nothing
-  browser2.syncNow();
-  console.log(browser2.getItem('key-1')); // returns 1
+  const client1 = new System(server);
+  const client2 = new System(server);
+  return { client1, client2 };
 }
 
-
-document.addEventListener('DOMContentLoaded', test);
+runTests();
 
 
 
