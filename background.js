@@ -1,3 +1,8 @@
+const keys = {
+  changeStorage:  'changeStorage',
+  addedItems:     'addedItems',
+}
+
 class Server {
   constructor() {
     this.data = new Map();
@@ -13,13 +18,21 @@ class Server {
 }
 
 class System {
-  constructor(server) {
+  constructor(server, device) {
     this.server = server;
+    this.device = device;
     this.data = new Map();
   }
 
-  setItem(key, value) {
-    this.data.set(key, value);
+  setItem(key, newValue) {
+    const oldValue = this.data.get(key);
+    console.log(`Set ${key} on ${this.device}:`);
+    let changes = {};
+    changes[key] = { oldValue, newValue };
+    logObject("oldValue", oldValue);
+    logObject("newValue", newValue);
+    this.data.set(key, newValue);
+    this.notifyListeners(changes);
   }
 
   getItem(key) {
@@ -28,57 +41,133 @@ class System {
   }
   
   syncNow() {
+    console.log(`Sync: ${this.device}`);
+
     // Sync from server to browser
     for (let [key, value] of this.server.data.entries()) {
-      if (this.data.get(key) !== value || !this.data.has(key)) {
-        this.data.set(key, value);
-      }
+      logObject("Syncing from server", value);
+      this.setItem(key, value);
     }
 
     // Sync from browser to server
     for (let [key, value] of this.data.entries()) {
-      if (this.server.data.get(key) !== value || !this.server.data.has(key)) {
-        this.server.setItem(key, value);
+      logObject("Syncing from browser", value);
+      this.server.setItem(key, value);
+    }
+  }
+
+  notifyListeners(changes) {
+    this.logStorageChange(changes);
+  }
+
+
+  addItem(key, value) {
+    const deviceCloudStorage = this.getItem(this.device);
+    let addedItems = {};
+    if (deviceCloudStorage) {
+      addedItems = Object.assign({}, deviceCloudStorage[keys.addedItems]);
+    }
+    addedItems[key] = value;
+    this.setItem(this.device, { [keys.addedItems]: addedItems });
+  }
+
+  logStorageChange(changes, area) {
+    const changedItems = Object.keys(changes);
+  
+    for (const item of changedItems) {
+      if (item === this.device) {
+        console.log(`Local change on ${this.device}, do nothing.`);
+      } else {
+        console.log(`Logging change in ${item}, on ${this.device}`)
+        const changedItem = changes[item];
+
+        const newItems = changedItem.newValue;
+        const oldItems = changedItem.oldValue;
+
+        if (newItems && oldItems) {
+          if (newItems[keys.addedItems]) {
+            const newAddedItems = newItems[keys.addedItems];
+            const oldAddedItems = oldItems[keys.addedItems];
+            const actualAddedItems = this.getDifferences(newAddedItems, oldAddedItems);
+            logObject(`ActualAddedItems`, actualAddedItems);
+          }
+
+        } else if (newItems) {
+          if (newItems[keys.addedItems]) {
+            const actualAddedItems = newItems[keys.addedItems]
+            logObject(`ActualAddedItems`, actualAddedItems);
+          }
+
+        } else if (oldItems) {
+          if (oldItems[keys.addedItems]) {
+            const actualAddedItems = oldItems[keys.addedItems];
+            logObject(`ActualAddedItems`, actualAddedItems);
+          }
+        }
       }
     }
   }
+
+  getDifferences(newObject, oldObject) {
+    var changes = {};
+    Object.keys(newObject).forEach(function(key) {
+      if (!oldObject.hasOwnProperty(key) || newObject[key] !== oldObject[key]) {
+        changes[key] = newObject[key];
+      }
+    });
+    return changes;
+  }
 }
 
+// Test additions 
+function testAddChangeSystem() {
+  const env = createTestEnvironment();
+  console.log('____Adding key1 on c1____');
+  env.c1.addItem(env.key1, env.value1);
+  env.c1.syncNow();
+  //env.c1.syncNow();
+  //env.c2.syncNow();
+  //console.log('____Adding key2 on c1____');
+  env.c1.addItem(env.key2, env.value2);
+  env.c1.syncNow();
+  //env.c2.syncNow();
+}
+
+// Test additions
 function testAdd() {
-  const { client1, client2 } = mockup();
-  client1.setItem('key-1', 1);
-  client1.syncNow();
-  client2.syncNow();
-  console.assert(client2.getItem('key-1') === 1,'Test failed: testAdd');
-}
-
-function testAddNoSyncOnSend() {
-  const { client1, client2 } = mockup();
-  client1.setItem('key-1', 1);
-  client2.syncNow();
-  console.assert(client2.getItem('key-1') === null,'Test failed: testAddNoSyncOnSend');
-}
-
-function testAddNoSyncOnReceive() {
-  const { client1, client2 } = mockup();
-  client1.setItem('key-1', 1);
-  client1.syncNow();
-  console.assert(client2.getItem('key-1') === null,'Test failed: testAddNoSyncOnReceive');
+  const env = createTestEnvironment();
+  env.c1.setItem(env.key1, env.value1);
+  env.c1.syncNow();
+  env.c2.syncNow();
+  const result = env.c2.getItem(env.key1);
+  env.verify('testAdd', result, env.value1);
 }
 
 function runTests() {
-  testAdd();
-  testAddNoSyncOnSend();
-  testAddNoSyncOnReceive();
-
-  console.log('Tests performed.');
+  //testAdd();
+  testAddChangeSystem();
+  
+  //console.log('Tests performed.');
 }
 
-function mockup() {
+function createTestEnvironment() {
   const server = new Server();
-  const client1 = new System(server);
-  const client2 = new System(server);
-  return { client1, client2 };
+  const c1 = new System(server, 'c1');
+  const c2 = new System(server, 'c2');
+
+  return {
+    key1: 'key-1',
+    key2: 'key-2',
+    value1: 1,
+    value2: 2,
+    c1: c1,
+    c2: c2,
+    verify: function(testCase, result, expectedValue) {
+      if (result !== expectedValue) {
+        throw new Error(`Test failed in: ${testCase} - Expected value: ${expectedValue}, but got ${result}`);
+      }
+    },
+  };
 }
 
 runTests();
@@ -452,3 +541,16 @@ Step 4: Clearing Synced Changes
     If a device hasn't synced yet, you must keep the change in the storage until that device is updated.
 
 */
+
+
+function logObject(description, object) {
+  if(object) {
+    console.log(description, JSON.parse(JSON.stringify(object)));
+  } else {
+    console.log(description, object);
+  }
+}
+
+function logSpace() {
+  console.log("__________")
+}

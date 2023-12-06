@@ -1,4 +1,4 @@
-function test() {
+function init() {
   populateSessionList();
   elements.saveBtn.addEventListener('click', saveCurrentSession);
   elements.restoreBtn.addEventListener('click', restoreSession);
@@ -143,4 +143,4 @@ function sendMessage(action, content) {
   }
 }
 
-document.addEventListener('DOMContentLoaded', test);
+document.addEventListener('DOMContentLoaded', init);
