@@ -7,7 +7,8 @@ const tabSessionManager = {
 
     const newSessionId = Date.now().toString(36);
     const tabs = await tabsAPI.getTabs(currentWindow.id);
-    const session = { id: newSessionId, name: name, tabs: tabs };
+    const favicon = tabsAPI.getFirstFavicon(tabs);
+    const session = { id: newSessionId, name: name, tabs: tabs, icon: favicon };
   
     await storageAPI.setSession(newSessionId, session);
     browser.sessions.setWindowValue(currentWindow.id, 'sessionId', newSessionId);  
@@ -79,6 +80,17 @@ const tabsAPI = {
 
   async openTabsInNewWindow(tabs) {
     return await browser.windows.create({ url: tabs.map(({ url }) => url) });
+  },
+
+  getFirstFavicon(tabs) {
+    //const favicons = getAllFavicons(tabs);
+    //if(favicons.length == 0) {
+      return 'run.png';
+    //}
+  },
+
+  getAllFavicons(tabs) {
+    
   }
 }
 
@@ -129,6 +141,11 @@ const storageAPI = {
     }
   }
   */
+}
+
+async function getCurrentWindowId() {
+  const currentWindow = await browser.windows.getLastFocused();
+  return await browser.sessions.getWindowValue(currentWindow.id, 'sessionId')
 }
 
 let port;

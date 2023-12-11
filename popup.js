@@ -28,10 +28,15 @@ async function populateSessionList() {
   const sessionList = elements.sessionList;
   sessionList.innerHTML = '';
   const storageItems = await storage.get();
+  const backgroundPage = await browser.extension.getBackgroundPage();
+  const currentSessionId = await backgroundPage.getCurrentWindowId();
+  let isSelected = false;
+
   for (const item in storageItems) {
     if (item.startsWith('session-')) {
       const session = storageItems[item];
-      sessionList.appendChild(new SessionListItem(session));
+      if (currentSessionId) isSelected = session.id == currentSessionId;
+      sessionList.appendChild(new SessionListItem(session, isSelected));
     }
   };
 }
@@ -49,10 +54,21 @@ async function clearStorage() {
 // Components
 
 class SessionListItem {
-  constructor(session) {
+  constructor(session, isSelected) {
     const sessionListItem = document.createElement('div');
-    sessionListItem.textContent = session.name;
     sessionListItem.addEventListener('click', () => MESSAGES.restoreSession(session.id));
+    sessionListItem.classList.add('item');
+    if (isSelected) sessionListItem.classList.add('selected');
+
+    const sessionIcon = document.createElement('img');
+    sessionIcon.src = session.icon;
+    sessionIcon.classList.add('favicon');
+    sessionListItem.append(sessionIcon);
+
+    const sessionName = document.createElement('div');
+    sessionName.textContent = session.name;
+    sessionListItem.append(sessionName);
+    
     return sessionListItem;
   }
 }
