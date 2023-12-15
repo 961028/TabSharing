@@ -1,17 +1,11 @@
+'use strict';
+
 export class ContextMenu {
     constructor() {
-        this.createMenu();
-    }
-
-    createMenu() {
         const menu = document.createElement("ul");
         menu.classList.add("context-menu");
         document.body.appendChild(menu);
         this.menu = menu;
-
-        document.addEventListener("click", () => {
-            this.hideMenu();
-        });
     }
 
     clearMenuItems() {
@@ -30,14 +24,18 @@ export class ContextMenu {
         this.menu.style.display = "block";
         const menuWidth = this.menu.offsetWidth;
         const menuHeight = this.menu.offsetHeight;
-        const windowWidth = window.innerWidth;
-        const windowHeight = window.innerHeight;
+        const windowWidth = window.innerWidth - 8;
+        const windowHeight = window.innerHeight - 8;
 
         const x = Math.min(e.clientX, windowWidth - menuWidth);
         const y = Math.min(e.clientY, windowHeight - menuHeight);
 
         this.menu.style.left = `${x}px`;
         this.menu.style.top = `${y}px`;
+
+        this.menu.setAttribute("tabindex", "-1"); // Makes the ul focusable
+        this.menu.focus();
+        this.menu.addEventListener("blur", this.hideMenu.bind(this), true);
     }
 
     hideMenu() {

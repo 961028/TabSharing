@@ -115,8 +115,8 @@ class SessionItem {
       });
 
       const addSeparatorMenuItem = new MenuItem("Add separator", async () => {
-        await addSeparator();
-        menu.hideMenu();
+        //await addSeparator();
+        //menu.hideMenu();
       });
   
       const deleteMenuItem = new MenuItem("Remove", async () => {
@@ -126,9 +126,11 @@ class SessionItem {
         menu.hideMenu();
       });
 
-      const editMenuItem = new MenuItem("Edit", async () => {
+      const editMenuItem = new MenuItem("Edit", async (event) => {
+        event.preventDefault();
         const menuItems = [renameMenuItem, changeIcon, changeColor, deleteMenuItem];
         menu.showMenu(event, item, menuItems);
+        //menu.hideMenu();
       });
   
       const menuItems = [editMenuItem, addSeparatorMenuItem];
@@ -142,7 +144,6 @@ class SessionItem {
 // Utils
 
 function selectText(node) {
-
   if (document.body.createTextRange) {
       const range = document.body.createTextRange();
       range.moveToElementText(node);

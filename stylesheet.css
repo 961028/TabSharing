@@ -7,8 +7,10 @@
   
   body {
     width: 400px;
+    min-height: 100%;
     background: rgba(28, 27, 34, 1);
     padding: 32px;
+    overflow: hidden;
   }
   
   .context-menu {
@@ -26,6 +28,7 @@
     padding: 8px 16px;
     border-radius: 4px;
     cursor: pointer;
+    user-select: none;
   }
   
   .context-menu-item:hover {
