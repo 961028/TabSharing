@@ -126,11 +126,9 @@ class SessionItem {
         menu.hideMenu();
       });
 
-      const editMenuItem = new MenuItem("Edit", async (event) => {
-        event.preventDefault();
+      const editMenuItem = new MenuItem("Edit", async () => {
         const menuItems = [renameMenuItem, changeIcon, changeColor, deleteMenuItem];
         menu.showMenu(event, item, menuItems);
-        //menu.hideMenu();
       });
   
       const menuItems = [editMenuItem, addSeparatorMenuItem];
