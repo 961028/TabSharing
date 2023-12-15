@@ -1,3 +1,7 @@
+import { ContextMenu, MenuItem } from './components/ContextMenu.js';
+import { DragAndDropList } from './components/DragAndDropList.js';
+const menu = new ContextMenu();
+
 function init() {
   populateSessionList();
   elements.saveBtn.addEventListener('click', saveCurrentSession);
@@ -36,7 +40,8 @@ async function populateSessionList() {
     if (item.startsWith('session-')) {
       const session = storageItems[item];
       if (currentSessionId) isSelected = session.id == currentSessionId;
-      sessionList.appendChild(new SessionListItem(session, isSelected));
+      const sessionListItem = new SessionItem(session, isSelected);
+      sessionList.appendChild(sessionListItem);
     }
   };
 }
@@ -53,27 +58,106 @@ async function clearStorage() {
 
 // Components
 
-class SessionListItem {
+class SessionItem {
   constructor(session, isSelected) {
-    const sessionListItem = document.createElement('div');
-    sessionListItem.addEventListener('click', () => MESSAGES.restoreSession(session.id));
-    sessionListItem.classList.add('item');
-    if (isSelected) sessionListItem.classList.add('selected');
+    const item = document.createElement('div');
+    item.classList.add('item');
+    if (isSelected) item.classList.add('selected');
 
     const sessionIcon = document.createElement('img');
     sessionIcon.src = session.icon;
     sessionIcon.classList.add('favicon');
-    sessionListItem.append(sessionIcon);
+    item.append(sessionIcon);
 
     const sessionName = document.createElement('div');
     sessionName.textContent = session.name;
-    sessionListItem.append(sessionName);
+    sessionName.contentEditable = 'false';
+    sessionName.classList.add('itemText');
+    item.append(sessionName);
+
+    item.addEventListener('click', async () => {
+      if (sessionName.contentEditable === 'false') {
+        MESSAGES.restoreSession(session.id)
+      }
+    });
+
+    sessionName.addEventListener('blur', async () => {
+      console.log("test");
+      if (sessionName.contentEditable === 'true') {
+        sessionName.contentEditable = 'false';
+        item.classList.remove('hasFocus');
+        let newName = sessionName.textContent.trim();
+        if (newName && newName !== session.name) {
+          //await storage.editTag(tag.id, newName);
+          sessionName.textContent = "newName";
+        } else {
+          sessionName.textContent = "session.name";
+        }
+      }
+    });
+
+    item.addEventListener('contextmenu', (event) => {
+      event.preventDefault();
+
+      const renameMenuItem = new MenuItem("Rename", async () => {
+        sessionName.contentEditable = 'true';
+        item.classList.add('hasFocus');
+        selectText(sessionName);
+      });
+
+      const changeIcon = new MenuItem("Change icon", async () => {
+        menu.hideMenu();
+      });
+
+      const changeColor = new MenuItem("Change color", async () => {
+        await addSeparator();
+        menu.hideMenu();
+      });
+
+      const addSeparatorMenuItem = new MenuItem("Add separator", async () => {
+        await addSeparator();
+        menu.hideMenu();
+      });
+  
+      const deleteMenuItem = new MenuItem("Remove", async () => {
+        await storage.deleteTag(tag.id);
+        updateTagsList(await storage.getTags());
+        searchBookmarks();
+        menu.hideMenu();
+      });
+
+      const editMenuItem = new MenuItem("Edit", async () => {
+        const menuItems = [renameMenuItem, changeIcon, changeColor, deleteMenuItem];
+        menu.showMenu(event, item, menuItems);
+      });
+  
+      const menuItems = [editMenuItem, addSeparatorMenuItem];
+      menu.showMenu(event, item, menuItems);
+    });
     
-    return sessionListItem;
+    return item;
   }
 }
 
 // Utils
+
+function selectText(node) {
+
+  if (document.body.createTextRange) {
+      const range = document.body.createTextRange();
+      range.moveToElementText(node);
+      range.select();
+  } else if (window.getSelection) {
+      const selection = window.getSelection();
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      selection.removeAllRanges();
+      selection.addRange(range);
+  } else {
+      console.warn("Could not select text in node: Unsupported browser.");
+  }
+}
+
 const storage = browser.storage.local;
 const storageAPI = {
 
