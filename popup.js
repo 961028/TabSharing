@@ -82,7 +82,6 @@ class SessionItem {
     });
 
     sessionName.addEventListener('blur', async () => {
-      console.log("test");
       if (sessionName.contentEditable === 'true') {
         sessionName.contentEditable = 'false';
         item.classList.remove('hasFocus');
@@ -105,20 +104,6 @@ class SessionItem {
         selectText(sessionName);
       });
 
-      const changeIcon = new MenuItem("Change icon", async () => {
-        menu.hideMenu();
-      });
-
-      const changeColor = new MenuItem("Change color", async () => {
-        await addSeparator();
-        menu.hideMenu();
-      });
-
-      const addSeparatorMenuItem = new MenuItem("Add separator", async () => {
-        //await addSeparator();
-        //menu.hideMenu();
-      });
-  
       const deleteMenuItem = new MenuItem("Remove", async () => {
         await storage.deleteTag(tag.id);
         updateTagsList(await storage.getTags());
@@ -126,12 +111,36 @@ class SessionItem {
         menu.hideMenu();
       });
 
-      const editMenuItem = new MenuItem("Edit", async () => {
+      const changeIcon = new MenuItem("Change Icon", async () => {
+        menu.hideMenu();
+      });
+
+      const changeColor = new MenuItem("Change Color", async () => {
+        await addSeparator();
+        menu.hideMenu();
+      });
+
+      const addSeparatorMenuItem = new MenuItem("Add Separator", async () => {
+        //await addSeparator();
+        //menu.hideMenu();
+      });
+
+      const addFolderMenuItem = new MenuItem("Add Folder", async () => {
+        //await addSeparator();
+        //menu.hideMenu();
+      });
+
+      const changeOrderMenuItem = new MenuItem("Edit Order", async () => {
+        //await addSeparator();
+        //menu.hideMenu();
+      });
+
+      const editMenuItem = new MenuItem("Edit Session", async () => {
         const menuItems = [renameMenuItem, changeIcon, changeColor, deleteMenuItem];
         menu.showMenu(event, item, menuItems);
       });
   
-      const menuItems = [editMenuItem, addSeparatorMenuItem];
+      const menuItems = [editMenuItem, changeOrderMenuItem, addFolderMenuItem, addSeparatorMenuItem];
       menu.showMenu(event, item, menuItems);
     });
     
