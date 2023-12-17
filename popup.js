@@ -1,6 +1,7 @@
 import { ContextMenu, MenuItem } from './components/ContextMenu.js';
 import { DragAndDropList } from './components/DragAndDropList.js';
 const menu = new ContextMenu();
+const storage = browser.storage.local;
 
 function init() {
   populateSessionList();
@@ -14,19 +15,29 @@ const elements = {
   clearBtn:     document.getElementById('clearBtn')
 }
 
-function saveCurrentSession() {
+async function saveCurrentSession() {
   const sessionName = 'Unnamed Session';
-  MESSAGES.saveSession(sessionName);
+  const backgroundPage = await browser.extension.getBackgroundPage();
+  backgroundPage.saveCurrentSession(sessionName).then(() => {
+    populateSessionList()
+  });
 }
 
 async function populateSessionList() {
+  const backgroundPage = await browser.extension.getBackgroundPage();
+  const currentSessionId = await backgroundPage.getCurrentWindowSessionId();
+
+  if (currentSessionId) {
+    saveBtn.style.display = 'none';
+  } else {
+    saveBtn.style.display = 'block';
+  }
+
   const sessionList = elements.sessionList;
   sessionList.innerHTML = '';
   const storageItems = await storage.get();
-  const backgroundPage = await browser.extension.getBackgroundPage();
-  const currentSessionId = await backgroundPage.getCurrentWindowSessionId();
-  let isSelected = false;
 
+  let isSelected = false;
   for (const item in storageItems) {
     if (item.startsWith('session-')) {
       const session = storageItems[item];
@@ -68,7 +79,10 @@ class SessionItem {
 
     item.addEventListener('click', async () => {
       if (sessionName.contentEditable === 'false') {
-        MESSAGES.restoreSession(session.id)
+        const backgroundPage = await browser.extension.getBackgroundPage();
+        backgroundPage.restoreSession(session.id).then(() => {
+          populateSessionList()
+        });;
       }
     });
 
@@ -162,65 +176,6 @@ function selectText(node) {
       selection.addRange(range);
   } else {
       console.warn("Could not select text in node: Unsupported browser.");
-  }
-}
-
-const storage = browser.storage.local;
-const storageAPI = {
-
-  async getSession(sessionId) {
-    const result = await storage.get(`session-${sessionId}`);
-    return result[`session-${sessionId}`];
-  },
-
-  async setSession(sessionId, session) {
-    await storage.set({ [`session-${sessionId}`]: session });
-  },
-
-  async renameSession(sessionId, newName) {
-    const session = await this.getSession(sessionId);
-    session.name = newName;
-    await this.setSession(sessionId, session);
-  },
-
-  async removeSession(sessionId) {
-    await storage.remove(`session-${sessionId}`);
-    const backgroundPage = await browser.extension.getBackgroundPage();
-    await backgroundPage.removeAllWindowValues(sessionId);
-  }
-}
-
-const port = browser.runtime.connect({ name: "popup-port" });
-port.onMessage.addListener(onMessage);
-
-const ACTIONS = {
-  saveSession() {
-    populateSessionList();
-  },
-}
-
-function onMessage(message) {
-  try {
-    ACTIONS[message.action](message.content);
-  } catch(error) {
-    console.error(`Failed to execute action: ${error}`);
-  }
-}
-
-const MESSAGES = {
-  saveSession(sessionName) {
-    sendMessage('saveSession', sessionName);
-  },
-  restoreSession(id) {
-    sendMessage('restoreSession', id);
-  },
-};
-
-function sendMessage(action, content) {
-  try {
-    port.postMessage({ action: action, content: content });
-  } catch (error) {
-    console.error(`Failed to send message: ${error}`);
   }
 }
 

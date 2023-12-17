@@ -1,106 +1,83 @@
-const tabSessionManager = {
-
-  async saveCurrentSession(name) {
-    const currentWindow = await getCurrentWindow();
-    const currentSessionId = await getWindowSessionId(currentWindow);
-    if (currentSessionId) return;
-
-    const newSessionId = Date.now().toString(36);
-    const tabs = await tabsAPI.getTabs(currentWindow.id);
-    const favicon = 'session.png';
-    const session = { id: newSessionId, name: name, tabs: tabs, icon: favicon };
-  
-    await storageAPI.setSession(newSessionId, session);
-    setWindowSessionId(currentWindow, newSessionId);  
-  },
-
-  async restoreSession(sessionId) {
-    const currentWindow = await getCurrentWindow();
-    const currentSessionId = await getWindowSessionId(currentWindow);
-
-    if (currentSessionId === sessionId) return;
-
-    const session = await storageAPI.getSession(sessionId);
-    if (!session) return;
-    
-    const currentTabs = await tabsAPI.getTabs(currentWindow.id);
-
-    await removeListeners();
-    await tabsAPI.openTabs(session.tabs);
-    await tabsAPI.closeTabs(currentTabs);
-    await addListeners();
-
-    browser.sessions.setWindowValue(currentWindow.id, 'sessionId', sessionId);
-  },
-
-  async restoreSessionAsNewWindow(sessionId) {
-    const session = await storageAPI.getSession(sessionId);
-    if (!session) return;
-
-    await removeListeners();
-    const newWindow = await tabsAPI.openTabsInNewWindow(session.tabs);
-    await browser.sessions.setWindowValue(newWindow.id, 'sessionId', sessionId);
-    await addListeners();
-  },
-
-  async updateSession(windowId) {
-    const sessionId = await browser.sessions.getWindowValue(windowId, 'sessionId');
-    if (!sessionId) {
-      console.log(`Window ${windowId} is not a saved session`);
-      return;
-    }
-
-    const session = await storageAPI.getSession(sessionId);
-    if (!session){
-      console.log(`No session found with id: ${sessionId}`);
-      return;
-    }
-    
-    session.tabs = await tabsAPI.getTabs(windowId);
-    await storageAPI.setSession(sessionId, session);
-    console.log(`Set tabs in ${session.name} too: ${session.tabs.map(({ url }) => url )}`)
-  }
-}
-
-const tabsAPI = {
-
-  async getTabs(windowId) {
-    const tabs = await browser.tabs.query({ windowId: windowId });
-    return tabs.map(({ url, title }) => ({ url, title }));
-  },
-
-  async closeTabs(tabs) {
-    const tabIds = tabs.map(({ id }) => id);
-    await browser.tabs.remove(tabIds);
-  },
-
-  async openTabs(tabs, windowId) {
-    await tabs.map(({ url }) => browser.tabs.create({ url: url, windowId: windowId }));
-  },
-
-  async openTabsInNewWindow(tabs) {
-    return await browser.windows.create({ url: tabs.map(({ url }) => url) });
-  }
-}
-
-// Utils
 const storage = browser.storage.local;
-const storageAPI = {
 
-  async getSession(sessionId) {
-    const result = await storage.get(`session-${sessionId}`);
-    return result[`session-${sessionId}`];
-  },
+async function saveCurrentSession(name) {
+  const currentWindow = await getCurrentWindow();
+  const currentSessionId = await getWindowSessionId(currentWindow);
+  if (currentSessionId) return;
 
-  async setSession(sessionId, session) {
-    await storage.set({ [`session-${sessionId}`]: session });
-  },
+  const newSessionId = Date.now().toString(36);
+  const tabs = await getTabs(currentWindow.id);
+  const favicon = await getFirstFavicon(tabs);
+  const session = { id: newSessionId, name: name, tabs: tabs, icon: favicon };
+
+  await setSession(newSessionId, session);
+  setWindowSessionId(currentWindow, newSessionId);
+}
+
+async function restoreSession(sessionId) {
+  const currentWindow = await getCurrentWindow();
+  const currentSessionId = await getWindowSessionId(currentWindow);
+
+  if (currentSessionId === sessionId) return;
+
+  const session = await getSession(sessionId);
+  if (!session) return;
+  
+  const currentTabs = await getTabs(currentWindow.id);
+
+  await removeListeners();
+  await openTabs(session.tabs);
+  await closeTabs(currentTabs);
+  await addListeners();
+
+  setWindowSessionId(currentWindow, sessionId);
+}
+
+async function restoreSessionAsNewWindow(sessionId) {
+  const session = await getSession(sessionId);
+  if (!session) return;
+
+  await removeListeners();
+  const newWindow = await openTabsInNewWindow(session.tabs);
+  await browser.sessions.setWindowValue(newWindow.id, 'sessionId', sessionId);
+  await addListeners();
+}
+
+async function updateSession(windowId) {
+  const sessionId = await browser.sessions.getWindowValue(windowId, 'sessionId');
+  if (!sessionId) {
+    console.log(`Window ${windowId} is not a saved session`);
+    return;
+  }
+
+  const session = await getSession(sessionId);
+  if (!session){
+    console.log(`No session found with id: ${sessionId}`);
+    return;
+  }
+  
+  session.tabs = await getTabs(windowId);
+  await setSession(sessionId, session);
+  console.log(`Set tabs in ${session.name} too: ${session.tabs.map(({ url }) => url )}`)
+}
+
+// --------------------------------------------
+//                  Storage
+// --------------------------------------------
+
+async function getSession(sessionId) {
+  const result = await storage.get(`session-${sessionId}`);
+  return result[`session-${sessionId}`];
+}
+
+async function setSession(sessionId, session) {
+  await storage.set({ [`session-${sessionId}`]: session });
 }
 
 async function renameSession(sessionId, newName) {
-  const session = await storageAPI.getSession(sessionId);
+  const session = await getSession(sessionId);
   session.name = newName;
-  await storageAPI.setSession(sessionId, session);
+  await setSession(sessionId, session);
 }
 
 async function removeSession(sessionId) {
@@ -112,8 +89,58 @@ async function removeSession(sessionId) {
   }
 }
 
-// Window SessionId Storage
+// --------------------------------------------
+//                    Tabs
+// --------------------------------------------
+async function getTabs(windowId) {
+  const tabs = await browser.tabs.query({ windowId: windowId });
+  return tabs.map(({ id, url, title, favIconUrl }) => ({ id, url, title, favIconUrl }));
+}
 
+async function closeTabs(tabs) {
+  console.log(tabs)
+  const tabIds = tabs.map(({ id }) => id);
+  await browser.tabs.remove(tabIds);
+}
+
+async function openTabs(tabs, windowId) {
+  await tabs.map(({ url }) => browser.tabs.create({ url: url, windowId: windowId }));
+}
+
+async function openTabsInNewWindow(tabs) {
+  return await browser.windows.create({ url: tabs.map(({ url }) => url) });
+}
+
+async function getAllFavicons(sessionId) {
+  const window = getSession(sessionId);
+  const tabs = getTabs(window.id);
+  let favicons = [];
+  for (const tab of tabs) {
+    const favIconUrl = await tab.favIconUrl;
+    if (favIconUrl) {
+      if (favIconUrl !== '') {
+        favicons.push(favIconUrl);
+      }
+    }
+  }
+  return favicons;
+}
+
+async function getFirstFavicon(tabs) {
+  for (const tab of tabs) {
+    const favIconUrl = await tab.favIconUrl;
+    if (favIconUrl) {
+      if (favIconUrl !== '') {
+        return favIconUrl;
+      }
+    }
+  }
+  return 'session.png';
+}
+
+// --------------------------------------------
+//                  Windows
+// --------------------------------------------
 function getWindowSessionId(window) {
   return browser.sessions.getWindowValue(window.id, 'sessionId');
 }
@@ -136,46 +163,9 @@ async function getCurrentWindowSessionId() {
   return await getWindowSessionId(currentWindow);
 }
 
-let port;
-browser.runtime.onConnect.addListener(connected);
-function connected(p) {
-  port = p;
-  port.onMessage.addListener(onMessage);
-}
-
-const ACTIONS = {
-  async saveSession(sessionName) {
-    await tabSessionManager.saveCurrentSession(sessionName);
-    CALLBACKS.saveSession(sessionName);
-  },
-  restoreSession(id) {
-    tabSessionManager.restoreSessionAsNewWindow(id);
-  },
-};
-
-function onMessage(message) {
-  try {
-    ACTIONS[message.action](message.content);
-  } catch(error) {
-    console.error(`Failed to execute action: ${error}`);
-  }
-}
-
-const CALLBACKS = {
-  saveSession() {
-    sendCallback('saveSession');
-  },
-};
-
-function sendCallback(action, content) {
-  try {
-    port.postMessage({ action: action, content: content });
-  } catch (error) {
-    console.error(`Failed to send message: ${error}`);
-  }
-}
-
-
+// --------------------------------------------
+//                 Listeners
+// --------------------------------------------
 async function onUrlUpdated(details) {
   let {listenersActive} = await browser.storage.session.get('listenersActive');
   if (!listenersActive) {
@@ -196,7 +186,7 @@ async function onUrlUpdated(details) {
   }
   const tabInfo = await browser.tabs.get(details.tabId);
   console.log(`onUrlUpdated: Tab ${details.tabId} in window ${tabInfo.windowId}: ${tabInfo.url}`);
-  tabSessionManager.updateSession(tabInfo.windowId);
+  updateSession(tabInfo.windowId);
 }
 
 async function onRemoved(tabId, removeInfo) {
@@ -211,23 +201,23 @@ async function onRemoved(tabId, removeInfo) {
   }
   console.log('onRemoved');
   setTimeout( () => {
-    tabSessionManager.updateSession(removeInfo.windowId);
+    updateSession(removeInfo.windowId);
   }, 120);
 }
 
 async function onMoved(tabId, moveInfo) {
   console.log('onMoved');
-  tabSessionManager.updateSession(moveInfo.windowId);
+  updateSession(moveInfo.windowId);
 }
 
 async function onAttached(tabId, attachInfo) {
   console.log('onAttached');
-  tabSessionManager.updateSession(attachInfo.newWindowId);
+  updateSession(attachInfo.newWindowId);
 }
 
 async function onDetached(tabId, detachInfo) {
   console.log('onDetached');
-  tabSessionManager.updateSession(detachInfo.oldWindowId);
+  updateSession(detachInfo.oldWindowId);
 }
 
 async function addListeners() {
@@ -246,17 +236,3 @@ browser.tabs.onMoved.addListener(onMoved);
 browser.tabs.onAttached.addListener(onAttached);
 browser.tabs.onDetached.addListener(onDetached);
 document.addEventListener('DOMContentLoaded', addListeners);
-
-/*
-function logStorageChange(changes, area) {
-  const changedItems = Object.keys(changes);
-
-  for (const item of changedItems) {
-    console.log(`${item} has changed:`);
-    console.log("Old value: ", changes[item].oldValue);
-    console.log("New value: ", changes[item].newValue);
-  }
-}
-*/
-
-//browser.storage.onChanged.addListener(logStorageChange);
