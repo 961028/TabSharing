@@ -123,7 +123,13 @@ class SessionItem {
       });
 
       const changeIcon = new MenuItem("Change Icon", async () => {
-        menu.hideMenu();
+        /*
+        const icon1 = new MenuItem("", 'session.png', () => {
+
+        });
+        const favicons = [icon1];
+        menu.showMenu(event, item, favicons);
+        */
       });
 
       /*

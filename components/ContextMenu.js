@@ -42,8 +42,6 @@ export class ContextMenu {
 
         this.renderMenu(e);
 
-        //this.setupKeyboardControl(this.menu);
-
         this.menu.setAttribute('tabindex', '-1'); // Makes the ul focusable
         this.menu.focus();
         this.menu.addEventListener('focusout', this.boundHideMenu, true);

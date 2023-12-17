@@ -7,7 +7,7 @@ async function saveCurrentSession(name) {
 
   const newSessionId = Date.now().toString(36);
   const tabs = await getTabs(currentWindow.id);
-  const favicon = await getFirstFavicon(tabs);
+  const favicon = 'session.png';
   const session = { id: newSessionId, name: name, tabs: tabs, icon: favicon };
 
   await setSession(newSessionId, session);
@@ -109,33 +109,6 @@ async function openTabs(tabs, windowId) {
 
 async function openTabsInNewWindow(tabs) {
   return await browser.windows.create({ url: tabs.map(({ url }) => url) });
-}
-
-async function getAllFavicons(sessionId) {
-  const window = getSession(sessionId);
-  const tabs = getTabs(window.id);
-  let favicons = [];
-  for (const tab of tabs) {
-    const favIconUrl = await tab.favIconUrl;
-    if (favIconUrl) {
-      if (favIconUrl !== '') {
-        favicons.push(favIconUrl);
-      }
-    }
-  }
-  return favicons;
-}
-
-async function getFirstFavicon(tabs) {
-  for (const tab of tabs) {
-    const favIconUrl = await tab.favIconUrl;
-    if (favIconUrl) {
-      if (favIconUrl !== '') {
-        return favIconUrl;
-      }
-    }
-  }
-  return 'session.png';
 }
 
 // --------------------------------------------
