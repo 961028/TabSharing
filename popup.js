@@ -19,7 +19,7 @@ const elements = {
 }
 
 function saveCurrentSession() {
-  const sessionName = elements.sessionName.value || 'Unnamed Session';
+  const sessionName = 'Unnamed Session';
   elements.sessionName.value = '';
   MESSAGES.saveSession(sessionName);
 }
@@ -33,13 +33,13 @@ async function populateSessionList() {
   sessionList.innerHTML = '';
   const storageItems = await storage.get();
   const backgroundPage = await browser.extension.getBackgroundPage();
-  const currentSessionId = await backgroundPage.getCurrentWindowId();
+  const currentSessionId = await backgroundPage.getCurrentWindowSessionId();
   let isSelected = false;
 
   for (const item in storageItems) {
     if (item.startsWith('session-')) {
       const session = storageItems[item];
-      if (currentSessionId) isSelected = session.id == currentSessionId;
+      if (currentSessionId) isSelected = session.id === currentSessionId;
       const sessionListItem = new SessionItem(session, isSelected);
       sessionList.appendChild(sessionListItem);
     }
@@ -87,10 +87,11 @@ class SessionItem {
         item.classList.remove('hasFocus');
         let newName = sessionName.textContent.trim();
         if (newName && newName !== session.name) {
-          //await storage.editTag(tag.id, newName);
-          sessionName.textContent = "newName";
+          const backgroundPage = await browser.extension.getBackgroundPage();
+          await backgroundPage.renameSession(session.id, newName);
+          sessionName.textContent = newName;
         } else {
-          sessionName.textContent = "session.name";
+          sessionName.textContent = session.name;
         }
       }
     });
@@ -105,16 +106,17 @@ class SessionItem {
       });
 
       const deleteMenuItem = new MenuItem("Remove", async () => {
-        await storage.deleteTag(tag.id);
-        updateTagsList(await storage.getTags());
-        searchBookmarks();
+        const backgroundPage = await browser.extension.getBackgroundPage();
+        await backgroundPage.removeSession(session.id);
         menu.hideMenu();
+        populateSessionList();
       });
 
       const changeIcon = new MenuItem("Change Icon", async () => {
         menu.hideMenu();
       });
 
+      /*
       const changeColor = new MenuItem("Change Color", async () => {
         await addSeparator();
         menu.hideMenu();
@@ -134,13 +136,15 @@ class SessionItem {
         //await addSeparator();
         //menu.hideMenu();
       });
-
+      
       const editMenuItem = new MenuItem("Edit Session", async () => {
         const menuItems = [renameMenuItem, changeIcon, changeColor, deleteMenuItem];
         menu.showMenu(event, item, menuItems);
       });
-  
+
       const menuItems = [editMenuItem, changeOrderMenuItem, addFolderMenuItem, addSeparatorMenuItem];
+      */
+      const menuItems = [renameMenuItem, changeIcon, deleteMenuItem];
       menu.showMenu(event, item, menuItems);
     });
     
@@ -149,7 +153,6 @@ class SessionItem {
 }
 
 // Utils
-
 function selectText(node) {
   if (document.body.createTextRange) {
       const range = document.body.createTextRange();
@@ -170,51 +173,26 @@ const storage = browser.storage.local;
 const storageAPI = {
 
   async getSession(sessionId) {
-    let result = await storage.get(`session-${sessionId}`);
+    const result = await storage.get(`session-${sessionId}`);
     return result[`session-${sessionId}`];
   },
 
   async setSession(sessionId, session) {
     await storage.set({ [`session-${sessionId}`]: session });
   },
-  /*
-  async get(key) {
-    let result = await storage.get(key);
-    return result[key];
+
+  async renameSession(sessionId, newName) {
+    const session = await this.getSession(sessionId);
+    session.name = newName;
+    await this.setSession(sessionId, session);
   },
 
-  async set(key, value) {
-    await storage.set({ [key]: value });
-  },
-
-  async remove(key) {
-    await storage.remove(key);
-  },
-
-  async getList(key) {
-    let result = await this.get(key);
-    return result || [];
-  },
-
-  async addToList(key, value) {
-    let list = [];
-    list = await this.getList(key);
-    list.push(value);
-    await this.set(key, list);
-  },
-
-  async removeFromList(key, value) {
-    let list = await this.getList(key);
-    let index = list.indexOf(value);
-    if (index > -1) {
-      list.splice(index, 1);
-      await this.set(key, list);
-    }
+  async removeSession(sessionId) {
+    await storage.remove(`session-${sessionId}`);
+    const backgroundPage = await browser.extension.getBackgroundPage();
+    await backgroundPage.removeAllWindowValues(sessionId);
   }
-  */
 }
-
-
 
 const port = browser.runtime.connect({ name: "popup-port" });
 port.onMessage.addListener(onMessage);

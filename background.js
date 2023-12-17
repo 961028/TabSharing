@@ -1,24 +1,24 @@
 const tabSessionManager = {
 
   async saveCurrentSession(name) {
-    const currentWindow = await browser.windows.getLastFocused();
-    const currentSessionId = await browser.sessions.getWindowValue(currentWindow.id, 'sessionId');
+    const currentWindow = await getCurrentWindow();
+    const currentSessionId = await getWindowSessionId(currentWindow);
     if (currentSessionId) return;
 
     const newSessionId = Date.now().toString(36);
     const tabs = await tabsAPI.getTabs(currentWindow.id);
-    const favicon = tabsAPI.getFirstFavicon(tabs);
+    const favicon = 'run.png';
     const session = { id: newSessionId, name: name, tabs: tabs, icon: favicon };
   
     await storageAPI.setSession(newSessionId, session);
-    browser.sessions.setWindowValue(currentWindow.id, 'sessionId', newSessionId);  
+    setWindowSessionId(currentWindow, newSessionId);  
   },
 
   async restoreSession(sessionId) {
-    const currentWindow = await browser.windows.getLastFocused();
-    const currentSessionId = await browser.sessions.getWindowValue(currentWindow.id, 'sessionId');
+    const currentWindow = await getCurrentWindow();
+    const currentSessionId = await getWindowSessionId(currentWindow);
 
-    if(currentSessionId === sessionId) return;
+    if (currentSessionId === sessionId) return;
 
     const session = await storageAPI.getSession(sessionId);
     if (!session) return;
@@ -51,7 +51,7 @@ const tabSessionManager = {
     }
 
     const session = await storageAPI.getSession(sessionId);
-    if(!session){
+    if (!session){
       console.log(`No session found with id: ${sessionId}`);
       return;
     }
@@ -80,17 +80,6 @@ const tabsAPI = {
 
   async openTabsInNewWindow(tabs) {
     return await browser.windows.create({ url: tabs.map(({ url }) => url) });
-  },
-
-  getFirstFavicon(tabs) {
-    //const favicons = getAllFavicons(tabs);
-    //if(favicons.length == 0) {
-      return 'run.png';
-    //}
-  },
-
-  getAllFavicons(tabs) {
-    
   }
 }
 
@@ -99,53 +88,52 @@ const storage = browser.storage.local;
 const storageAPI = {
 
   async getSession(sessionId) {
-    let result = await storage.get(`session-${sessionId}`);
+    const result = await storage.get(`session-${sessionId}`);
     return result[`session-${sessionId}`];
   },
 
   async setSession(sessionId, session) {
     await storage.set({ [`session-${sessionId}`]: session });
   },
-  /*
-  async get(key) {
-    let result = await storage.get(key);
-    return result[key];
-  },
-
-  async set(key, value) {
-    await storage.set({ [key]: value });
-  },
-
-  async remove(key) {
-    await storage.remove(key);
-  },
-
-  async getList(key) {
-    let result = await this.get(key);
-    return result || [];
-  },
-
-  async addToList(key, value) {
-    let list = [];
-    list = await this.getList(key);
-    list.push(value);
-    await this.set(key, list);
-  },
-
-  async removeFromList(key, value) {
-    let list = await this.getList(key);
-    let index = list.indexOf(value);
-    if (index > -1) {
-      list.splice(index, 1);
-      await this.set(key, list);
-    }
-  }
-  */
 }
 
-async function getCurrentWindowId() {
+async function renameSession(sessionId, newName) {
+  const session = await storageAPI.getSession(sessionId);
+  session.name = newName;
+  await storageAPI.setSession(sessionId, session);
+}
+
+async function removeSession(sessionId) {
+  await storage.remove(`session-${sessionId}`);
+  const allWindows = await browser.windows.getAll();
+  for (const window of allWindows) {
+    const windowSessionId = await getWindowSessionId(window);
+    if (windowSessionId === sessionId) removeWindowSessionId(window);
+  }
+}
+
+// Window SessionId Storage
+
+function getWindowSessionId(window) {
+  return browser.sessions.getWindowValue(window.id, 'sessionId');
+}
+
+function setWindowSessionId(window, newSessionId) {
+  browser.sessions.setWindowValue(window.id, 'sessionId', newSessionId);
+}
+
+function removeWindowSessionId(window) {
+  browser.sessions.removeWindowValue(window.id, 'sessionId');
+}
+
+async function getCurrentWindow() {
   const currentWindow = await browser.windows.getLastFocused();
-  return await browser.sessions.getWindowValue(currentWindow.id, 'sessionId')
+  return currentWindow;
+}
+
+async function getCurrentWindowSessionId() {
+  const currentWindow = await getCurrentWindow();
+  return await getWindowSessionId(currentWindow);
 }
 
 let port;
@@ -189,20 +177,20 @@ function sendCallback(action, content) {
 
 
 async function onUrlUpdated(details) {
-  let {listenersActive} = await browser.storage.local.get('listenersActive');
-  if(!listenersActive) {
+  let {listenersActive} = await browser.storage.session.get('listenersActive');
+  if (!listenersActive) {
     console.log('!onUrlUpdated: listeners inactive');
     return;
   }
-  if(details.transitionType === 'auto_subframe') {
+  if (details.transitionType === 'auto_subframe') {
     //console.log('!onUrlUpdated: auto_subframe');
     return;
   }
-  if(details.transitionType === 'reload') {
+  if (details.transitionType === 'reload') {
     //console.log('!onUrlUpdated: reload');
-    //return;
+    return;
   }
-  if(details.frameId !== 0) {
+  if (details.frameId !== 0) {
     //console.log('!onUrlUpdated: details.frameId !== 0');
     return;
   }
@@ -213,16 +201,18 @@ async function onUrlUpdated(details) {
 
 async function onRemoved(tabId, removeInfo) {
   let {listenersActive} = await browser.storage.local.get('listenersActive');
-  if(listenersActive) {
-    if(removeInfo.isWindowClosing) {
-      console.log('window closed: !onRemoved');
-    } else {
-      console.log('onRemoved');
-      setTimeout(() => {tabSessionManager.updateSession(removeInfo.windowId);}, 110);
-    }
-  } else {
+  if (!listenersActive) {
     console.log('listeners inactive: !onRemoved');
+    return;
   }
+  if (removeInfo.isWindowClosing) {
+    console.log('window closed: !onRemoved');
+    return;
+  }
+  console.log('onRemoved');
+  setTimeout( () => {
+    tabSessionManager.updateSession(removeInfo.windowId);
+  }, 120);
 }
 
 async function onMoved(tabId, moveInfo) {
@@ -242,12 +232,12 @@ async function onDetached(tabId, detachInfo) {
 
 async function addListeners() {
   //console.log('activating listeners');
-  await browser.storage.local.set({'listenersActive': true});
+  await browser.storage.session.set({'listenersActive': true});
 }
 
 async function removeListeners() {
   //console.log('deactivating listeners');
-  await browser.storage.local.set({'listenersActive': false});
+  await browser.storage.session.set({'listenersActive': false});
 }
 
 browser.webNavigation.onCommitted.addListener(onUrlUpdated);
@@ -257,7 +247,7 @@ browser.tabs.onAttached.addListener(onAttached);
 browser.tabs.onDetached.addListener(onDetached);
 document.addEventListener('DOMContentLoaded', addListeners);
 
-
+/*
 function logStorageChange(changes, area) {
   const changedItems = Object.keys(changes);
 
@@ -267,5 +257,6 @@ function logStorageChange(changes, area) {
     console.log("New value: ", changes[item].newValue);
   }
 }
+*/
 
 //browser.storage.onChanged.addListener(logStorageChange);
