@@ -5,27 +5,18 @@ const menu = new ContextMenu();
 function init() {
   populateSessionList();
   elements.saveBtn.addEventListener('click', saveCurrentSession);
-  elements.restoreBtn.addEventListener('click', restoreSession);
   elements.clearBtn.addEventListener('click', clearStorage);
 }
 
 const elements = {
-  sessionName:  document.getElementById('sessionName'),
   sessionList:  document.getElementById('sessionList'),
   saveBtn:      document.getElementById('saveBtn'),
-  restoreBtn:   document.getElementById('restoreBtn'),
-  deleteBtn:    document.getElementById('deleteBtn'),
   clearBtn:     document.getElementById('clearBtn')
 }
 
 function saveCurrentSession() {
   const sessionName = 'Unnamed Session';
-  elements.sessionName.value = '';
   MESSAGES.saveSession(sessionName);
-}
-
-async function restoreSession(id) {
-  MESSAGES.restoreSession(id);
 }
 
 async function populateSessionList() {
@@ -103,6 +94,11 @@ class SessionItem {
         sessionName.contentEditable = 'true';
         item.classList.add('hasFocus');
         selectText(sessionName);
+        sessionName.addEventListener('keydown', (e) => {
+          if (e.code === 'Enter') {
+            sessionName.blur();
+          }
+        })
       });
 
       const deleteMenuItem = new MenuItem("Remove", async () => {

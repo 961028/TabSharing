@@ -7,7 +7,7 @@ const tabSessionManager = {
 
     const newSessionId = Date.now().toString(36);
     const tabs = await tabsAPI.getTabs(currentWindow.id);
-    const favicon = 'run.png';
+    const favicon = 'session.png';
     const session = { id: newSessionId, name: name, tabs: tabs, icon: favicon };
   
     await storageAPI.setSession(newSessionId, session);

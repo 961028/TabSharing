@@ -24,7 +24,7 @@
       ],
 
       "action": {
-        "default_icon": "run.png",
+        "default_icon": "logo.png",
         "default_title": "Session Manager",
         "default_popup": "popup.html"
       },
